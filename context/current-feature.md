@@ -17,3 +17,7 @@
 ## History
 
 <!-- Keep this updated. Earliest to latest. -->
+
+**Initial Setup** - Initial commit from Create Next App
+**Cleanup boilerplate**
+**Context init files**
