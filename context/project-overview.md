@@ -31,15 +31,15 @@
 
 Developers keep their essentials scattered across too many places:
 
-| Where it lives now | What it is |
-| --- | --- |
-| VS Code / Notion | Code snippets |
-| AI chats | Prompts, system messages |
-| Random project folders | Context files, docs |
-| Browser bookmarks | Useful links |
-| `.txt` files | Commands |
-| GitHub Gists | Project templates, boilerplates |
-| `bash_history` | Terminal commands |
+| Where it lives now     | What it is                      |
+| ---------------------- | ------------------------------- |
+| VS Code / Notion       | Code snippets                   |
+| AI chats               | Prompts, system messages        |
+| Random project folders | Context files, docs             |
+| Browser bookmarks      | Useful links                    |
+| `.txt` files           | Commands                        |
+| GitHub Gists           | Project templates, boilerplates |
+| `bash_history`         | Terminal commands               |
 
 This causes **context switching**, **lost knowledge**, and **inconsistent workflows**. DevStash consolidates all of it into a single fast, searchable, AI-enhanced hub.
 
@@ -60,15 +60,15 @@ This causes **context switching**, **lost knowledge**, and **inconsistent workfl
 
 Every stashed thing is an **Item** with a **type**. Users can create custom types later (Pro), but we ship with these **system types** (immutable):
 
-| Type | Content kind | Availability |
-| --- | --- | --- |
-| `snippet` | text | Free |
-| `prompt` | text | Free |
-| `note` | text | Free |
-| `command` | text | Free |
-| `link` | url | Free |
-| `file` | file | **Pro** |
-| `image` | file | **Pro** |
+| Type      | Content kind | Availability |
+| --------- | ------------ | ------------ |
+| `snippet` | text         | Free         |
+| `prompt`  | text         | Free         |
+| `note`    | text         | Free         |
+| `command` | text         | Free         |
+| `link`    | url          | Free         |
+| `file`    | file         | **Pro**      |
+| `image`   | file         | **Pro**      |
 
 - A type resolves to one of three content kinds: **text** (snippet, note, prompt, command), **url** (link), or **file** (file, image).
 - Type-scoped list routes look like `/items/snippets`, `/items/commands`, etc.
@@ -77,8 +77,8 @@ Every stashed thing is an **Item** with a **type**. Users can create custom type
 ### B. Collections
 
 - Users create **collections** that can hold items of **any type**.
-- An item can belong to **multiple collections** (e.g. a React snippet in both *React Patterns* and *Interview Prep*) — handled via a join table.
-- Examples: *React Patterns* (snippets, notes), *Context Files* (files), *Python Snippets* (snippets).
+- An item can belong to **multiple collections** (e.g. a React snippet in both _React Patterns_ and _Interview Prep_) — handled via a join table.
+- Examples: _React Patterns_ (snippets, notes), _Context Files_ (files), _Python Snippets_ (snippets).
 
 ### C. Search
 
@@ -102,7 +102,7 @@ Powerful search across **content**, **tags**, **titles**, and **types**.
 - 🔀 Add/remove items to/from multiple collections
 - 🔎 View which collections an item belongs to
 
-### F. AI Features — *Pro only*
+### F. AI Features — _Pro only_
 
 - 🏷️ AI auto-tag suggestions
 - 📝 AI summaries
@@ -368,7 +368,7 @@ model VerificationToken {
 - **`onDelete: Cascade`** on user-owned relations so deleting a user cleanly removes their items, collections, tags, and custom types.
 - **`ContentType` enum (`TEXT | FILE | URL`)** drives storage — it tells the code which field holds the payload, independent of the user-facing `itemType`: `TEXT` → `content`, `FILE` → `fileUrl`/`fileName`/`fileSize`, `URL` → `url` (link items). A dedicated `URL` value (instead of overloading `TEXT`) lets rendering/validation resolve the payload with a single `switch` on `contentType`, and gives future custom types a clean storage shape to map onto.
 - **IDs use `cuid()`**
-- **Quotas (50 items / 3 collections on Free)** are enforced in the API layer, not the schema. Foundation should be built now even though *all users get everything during development*.
+- **Quotas (50 items / 3 collections on Free)** are enforced in the API layer, not the schema. Foundation should be built now even though _all users get everything during development_.
 - **System types are seeded** via a migration/seed script so they exist for every environment.
 
 ---
@@ -440,20 +440,20 @@ sequenceDiagram
 
 ## 6. Tech Stack
 
-| Layer | Choice | Docs |
-| --- | --- | --- |
-| Framework | Next.js 16 (SSR + API routes, one repo) | [nextjs.org/docs](https://nextjs.org/docs) |
-| UI runtime | React 19 | [react.dev](https://react.dev) |
-| Language | TypeScript | [typescriptlang.org/docs](https://www.typescriptlang.org/docs) |
-| ORM | Prisma 7 | [prisma.io/docs](https://www.prisma.io/docs) |
-| Database | Neon — serverless PostgreSQL | [neon.tech/docs](https://neon.tech/docs) · [postgresql.org/docs](https://www.postgresql.org/docs) |
-| Cache *(maybe)* | Redis | [redis.io/docs](https://redis.io/docs) |
-| File storage | Cloudflare R2 | [developers.cloudflare.com/r2](https://developers.cloudflare.com/r2/) |
-| Auth | NextAuth / Auth.js v5 (email+password, GitHub OAuth) | [authjs.dev](https://authjs.dev) |
-| AI | OpenAI — `gpt-5-nano` | [platform.openai.com/docs](https://platform.openai.com/docs) |
-| Styling | Tailwind CSS v4 | [tailwindcss.com/docs](https://tailwindcss.com/docs) |
-| Components | shadcn/ui | [ui.shadcn.com](https://ui.shadcn.com) |
-| Billing | Stripe | [docs.stripe.com](https://docs.stripe.com) |
+| Layer           | Choice                                               | Docs                                                                                              |
+| --------------- | ---------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| Framework       | Next.js 16 (SSR + API routes, one repo)              | [nextjs.org/docs](https://nextjs.org/docs)                                                        |
+| UI runtime      | React 19                                             | [react.dev](https://react.dev)                                                                    |
+| Language        | TypeScript                                           | [typescriptlang.org/docs](https://www.typescriptlang.org/docs)                                    |
+| ORM             | Prisma 7                                             | [prisma.io/docs](https://www.prisma.io/docs)                                                      |
+| Database        | Neon — serverless PostgreSQL                         | [neon.tech/docs](https://neon.tech/docs) · [postgresql.org/docs](https://www.postgresql.org/docs) |
+| Cache _(maybe)_ | Redis                                                | [redis.io/docs](https://redis.io/docs)                                                            |
+| File storage    | Cloudflare R2                                        | [developers.cloudflare.com/r2](https://developers.cloudflare.com/r2/)                             |
+| Auth            | NextAuth / Auth.js v5 (email+password, GitHub OAuth) | [authjs.dev](https://authjs.dev)                                                                  |
+| AI              | OpenAI — `gpt-5-nano`                                | [platform.openai.com/docs](https://platform.openai.com/docs)                                      |
+| Styling         | Tailwind CSS v4                                      | [tailwindcss.com/docs](https://tailwindcss.com/docs)                                              |
+| Components      | shadcn/ui                                            | [ui.shadcn.com](https://ui.shadcn.com)                                                            |
+| Billing         | Stripe                                               | [docs.stripe.com](https://docs.stripe.com)                                                        |
 
 > **DB rule:** never `db push` or hand-edit the schema in the database — **migrations only**, dev → prod.
 
@@ -463,20 +463,20 @@ sequenceDiagram
 
 Freemium. Build the Pro foundation now, but **during development every user can access everything.**
 
-| | **Free** | **Pro — $8/mo or $72/yr** |
-| --- | --- | --- |
-| Items | 50 total | Unlimited |
-| Collections | 3 | Unlimited |
-| System types | All except file/image | All |
-| File & image uploads | ❌ | ✅ |
-| Custom types | ❌ | ✅ *(later)* |
-| Search | Basic | Basic |
-| AI auto-tagging | ❌ | ✅ |
-| AI code explanation | ❌ | ✅ |
-| AI prompt optimizer | ❌ | ✅ |
-| AI summaries | ❌ | ✅ |
-| Export (JSON / ZIP) | ❌ | ✅ |
-| Support | Standard | Priority |
+|                      | **Free**              | **Pro — $8/mo or $72/yr** |
+| -------------------- | --------------------- | ------------------------- |
+| Items                | 50 total              | Unlimited                 |
+| Collections          | 3                     | Unlimited                 |
+| System types         | All except file/image | All                       |
+| File & image uploads | ❌                    | ✅                        |
+| Custom types         | ❌                    | ✅ _(later)_              |
+| Search               | Basic                 | Basic                     |
+| AI auto-tagging      | ❌                    | ✅                        |
+| AI code explanation  | ❌                    | ✅                        |
+| AI prompt optimizer  | ❌                    | ✅                        |
+| AI summaries         | ❌                    | ✅                        |
+| Export (JSON / ZIP)  | ❌                    | ✅                        |
+| Support              | Standard              | Priority                  |
 
 ---
 
@@ -500,6 +500,11 @@ Freemium. Build the Pro foundation now, but **during development every user can 
 
 - Desktop-first, mobile-usable. Sidebar becomes a drawer on mobile.
 
+**Screenshots**
+Refer to the screenshots below as a base for the dashboard UI. It does not have to be exact. Use it as reference.
+@context/screenshots/dashboard-ui-main.png
+@context/screenshots/dashboard-ui-drawer.png
+
 **Micro-interactions**
 
 - Smooth transitions, hover states on cards, toast notifications for actions, loading skeletons.
@@ -510,15 +515,15 @@ Freemium. Build the Pro foundation now, but **during development every user can 
 
 Icons are [lucide](https://lucide.dev/icons) names. Colors are used for card backgrounds (collections) and card borders (items).
 
-| Swatch | Type | Hex | Lucide Icon | Kind | Route |
-| :---: | --- | --- | --- | --- | --- |
-| 🔵 | Snippet | `#3b82f6` | `Code` | text | `/items/snippets` |
-| 🟣 | Prompt | `#8b5cf6` | `Sparkles` | text | `/items/prompts` |
-| 🟠 | Command | `#f97316` | `Terminal` | text | `/items/commands` |
-| 🟡 | Note | `#fde047` | `StickyNote` | text | `/items/notes` |
-| ⚪ | File | `#6b7280` | `File` | file | `/items/files` |
-| 🩷 | Image | `#ec4899` | `Image` | file | `/items/images` |
-| 🟢 | Link | `#10b981` | `Link` | url | `/items/links` |
+| Swatch | Type    | Hex       | Lucide Icon  | Kind | Route             |
+| :----: | ------- | --------- | ------------ | ---- | ----------------- |
+|   🔵   | Snippet | `#3b82f6` | `Code`       | text | `/items/snippets` |
+|   🟣   | Prompt  | `#8b5cf6` | `Sparkles`   | text | `/items/prompts`  |
+|   🟠   | Command | `#f97316` | `Terminal`   | text | `/items/commands` |
+|   🟡   | Note    | `#fde047` | `StickyNote` | text | `/items/notes`    |
+|   ⚪   | File    | `#6b7280` | `File`       | file | `/items/files`    |
+|   🩷   | Image   | `#ec4899` | `Image`      | file | `/items/images`   |
+|   🟢   | Link    | `#10b981` | `Link`       | url  | `/items/links`    |
 
 ---
 
@@ -539,4 +544,4 @@ A pragmatic sequence to reach a usable MVP fast (not from your notes — a sugge
 
 ---
 
-*Generated from planning notes — refined, de-duplicated, and formatted. Data model and build order are proposals; adjust freely.*
+_Generated from planning notes — refined, de-duplicated, and formatted. Data model and build order are proposals; adjust freely._
