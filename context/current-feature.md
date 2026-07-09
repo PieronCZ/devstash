@@ -1,18 +1,24 @@
 # Current Feature
 
-<!-- Feature name and short description -->
+Dashboard UI Phase 3 — build out the main content area (final phase of the 3-phase dashboard UI layout).
 
 ## Status
 
-<!-- Not Started | In Progress | Completed -->
+In Progress
 
 ## Goals
 
-<!-- Goals and requirements -->
+Build the main content area to the right of the sidebar, using mock data (`@src/lib/mock-data.js`) imported directly until the database is implemented. Match the reference screenshot (`@context/screenshots/dashboard-ui-main.png`).
+
+- 4 stats cards at the top: number of items, collections, favorite items, and favorite collections (not shown in screenshot)
+- Recent collections
+- Pinned items
+- 10 recent items
 
 ## Notes
 
-<!-- Any extra notes -->
+- Import mock data directly for now; database comes later.
+- References: `@context/screenshots/dashboard-ui-main.png`, `@context/project-overview.md`, `@src/lib/mock-data.js`, `@context/features/dashboard-phase-1-spec.md`, `@context/features/dashboard-phase-2-spec.md`
 
 ## History
 
