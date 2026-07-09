@@ -1,5 +1,7 @@
 import { cookies } from "next/headers";
 
+import { getSidebarCollections } from "@/lib/db/collections";
+import { getSidebarItemTypes } from "@/lib/db/items";
 import { AppSidebar } from "@/components/dashboard/AppSidebar";
 import { TopBar } from "@/components/dashboard/TopBar";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
@@ -14,10 +16,15 @@ export default async function DashboardLayout({
   const cookieStore = await cookies();
   const defaultOpen = cookieStore.get("sidebar_state")?.value !== "false";
 
+  const [itemTypes, collections] = await Promise.all([
+    getSidebarItemTypes(),
+    getSidebarCollections(),
+  ]);
+
   return (
     <TooltipProvider>
       <SidebarProvider defaultOpen={defaultOpen}>
-        <AppSidebar />
+        <AppSidebar itemTypes={itemTypes} collections={collections} />
         <SidebarInset>
           <TopBar />
           <main className="flex-1 p-6">{children}</main>

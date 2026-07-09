@@ -85,3 +85,60 @@ export async function getRecentCollections(): Promise<DashboardCollection[]> {
     };
   });
 }
+
+// A collection as shown in the sidebar's Collections group.
+export interface SidebarCollection {
+  id: string;
+  name: string;
+  isFavorite: boolean;
+  accentColor: string; // most-used type's color; drives the recent dot
+}
+
+// Collections for the sidebar's Collections group: all favorites, plus the
+// four most recently updated. Each carries the accent color derived from its
+// most-used item type (falling back to the default type for empty collections).
+export async function getSidebarCollections(): Promise<{
+  favorites: SidebarCollection[];
+  recent: SidebarCollection[];
+}> {
+  const collections = await prisma.collection.findMany({
+    where: { user: { email: DEMO_EMAIL } },
+    orderBy: { updatedAt: "desc" },
+    include: {
+      defaultType: { select: { color: true } },
+      items: {
+        select: {
+          item: { select: { itemType: { select: { id: true, color: true } } } },
+        },
+      },
+    },
+  });
+
+  const mapped: SidebarCollection[] = collections.map((collection) => {
+    // Tally usage per item type to find the most-used one's color.
+    const counts = new Map<string, { color: string; count: number }>();
+    for (const { item } of collection.items) {
+      const t = item.itemType;
+      const entry = counts.get(t.id);
+      if (entry) {
+        entry.count += 1;
+      } else {
+        counts.set(t.id, { color: t.color, count: 1 });
+      }
+    }
+    const ranked = [...counts.values()].sort((a, b) => b.count - a.count);
+
+    return {
+      id: collection.id,
+      name: collection.name,
+      isFavorite: collection.isFavorite,
+      accentColor:
+        ranked[0]?.color ?? collection.defaultType?.color ?? "currentColor",
+    };
+  });
+
+  return {
+    favorites: mapped.filter((c) => c.isFavorite),
+    recent: mapped.slice(0, 4), // already sorted newest-first
+  };
+}
