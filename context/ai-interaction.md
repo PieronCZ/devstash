@@ -25,6 +25,8 @@ This is the common workflow that we will use for every single feature/fix:
 
 Do NOT commit without permission and until the build passes. If build fails, fix the issues first.
 
+Don't run npm run build while npm run dev is running against the same folder. If you need to verify a production build during a session, you should stop current dev server first.
+
 ## Branching
 
 We will create a new branch for every feature/fix. Name branch **feature/[feature]** or **fix[fix]**, etc. Ask to delete the branch once merged.
