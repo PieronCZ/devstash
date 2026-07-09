@@ -19,6 +19,7 @@ import type { SidebarItemType } from "@/lib/db/items";
 import type { SidebarCollection } from "@/lib/db/collections";
 import { getTypeIcon } from "@/lib/icons";
 import { cn } from "@/lib/utils";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Collapsible,
@@ -40,6 +41,9 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
+
+// Item types gated behind a Pro plan — flagged with a PRO badge in the sidebar.
+const PRO_TYPES = new Set(["file", "image"]);
 
 // Primary navigation shown above the type list.
 const mainNav = [
@@ -153,6 +157,16 @@ export function AppSidebar({ itemTypes, collections }: AppSidebarProps) {
                     >
                       <Icon style={{ color: type.color }} />
                       <span className="capitalize">{type.name}</span>
+                      {PRO_TYPES.has(type.name) ? (
+                        // `outline` variant so no bg-color sits under the gradient;
+                        // `mr-7` reserves room for the count badge (absolute right-1).
+                        <Badge
+                          variant="outline"
+                          className="ml-auto mr-7 h-4 border-0 bg-[linear-gradient(to_right,#8b5cf6,#ec4899)] px-1.5 text-[10px] font-semibold tracking-wide text-white uppercase group-data-[collapsible=icon]:hidden"
+                        >
+                          Pro
+                        </Badge>
+                      ) : null}
                     </SidebarMenuButton>
                     <SidebarMenuBadge className="text-sidebar-foreground/45">
                       {type.count}
