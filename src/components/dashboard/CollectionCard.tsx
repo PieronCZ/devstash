@@ -1,33 +1,19 @@
 import Link from "next/link";
 import { Star } from "lucide-react";
 
-import { items, itemTypes, type Collection } from "@/lib/mock-data";
+import type { DashboardCollection } from "@/lib/db/collections";
 import { getTypeIcon } from "@/lib/icons";
 import { relativeTime } from "@/lib/format";
 
-function typeColor(typeId: string): string {
-  return itemTypes.find((type) => type.id === typeId)?.color ?? "currentColor";
-}
-
-// Distinct item types held by a collection, for the little icon chips.
-// Falls back to the collection's default type when it has no items yet.
-function collectionTypeIds(collection: Collection): string[] {
-  const ids = new Set<string>();
-  for (const item of items) {
-    if (item.collectionIds.includes(collection.id)) ids.add(item.typeId);
-  }
-  if (ids.size === 0) ids.add(collection.defaultTypeId);
-  return [...ids].slice(0, 3);
-}
-
-export function CollectionCard({ collection }: { collection: Collection }) {
-  const accent = typeColor(collection.defaultTypeId);
-  const typeIds = collectionTypeIds(collection);
-
+export function CollectionCard({
+  collection,
+}: {
+  collection: DashboardCollection;
+}) {
   return (
     <Link
       href={`/collections/${collection.id}`}
-      style={{ borderTopColor: accent }}
+      style={{ borderTopColor: collection.accentColor }}
       className="flex flex-col rounded-xl border border-t-2 bg-card p-4 transition-colors hover:bg-accent/40"
     >
       <div className="flex items-start justify-between gap-2">
@@ -45,17 +31,15 @@ export function CollectionCard({ collection }: { collection: Collection }) {
 
       <div className="mt-4 flex items-end justify-between gap-2">
         <div className="flex items-center gap-1.5">
-          {typeIds.map((typeId) => {
-            const type = itemTypes.find((t) => t.id === typeId);
-            const Icon = getTypeIcon(type?.icon ?? "File");
-            const color = type?.color ?? "currentColor";
+          {collection.types.map((type) => {
+            const Icon = getTypeIcon(type.icon);
             return (
               <span
-                key={typeId}
+                key={type.id}
                 className="flex size-6 items-center justify-center rounded-md"
-                style={{ backgroundColor: `${color}1a` }}
+                style={{ backgroundColor: `${type.color}1a` }}
               >
-                <Icon className="size-3.5" style={{ color }} />
+                <Icon className="size-3.5" style={{ color: type.color }} />
               </span>
             );
           })}

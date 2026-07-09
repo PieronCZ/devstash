@@ -1,10 +1,14 @@
 import type { LucideIcon } from "lucide-react";
 import { Boxes, Clock, FolderHeart, FolderOpen, LayoutGrid, Pin, Star } from "lucide-react";
 
-import { collections, items } from "@/lib/mock-data";
+import { items } from "@/lib/mock-data";
+import { getRecentCollections } from "@/lib/db/collections";
 import { CollectionCard } from "@/components/dashboard/CollectionCard";
 import { ItemCard } from "@/components/dashboard/ItemCard";
 import { StatCard } from "@/components/dashboard/StatCard";
+
+// Collections are read live from the database on each request.
+export const dynamic = "force-dynamic";
 
 function SectionHeader({
   icon: Icon,
@@ -21,15 +25,14 @@ function SectionHeader({
   );
 }
 
-export default function DashboardPage() {
+export default async function DashboardPage() {
+  const recentCollections = await getRecentCollections();
+
   const favoriteItems = items.filter((item) => item.isFavorite);
-  const favoriteCollections = collections.filter(
+  const favoriteCollections = recentCollections.filter(
     (collection) => collection.isFavorite,
   );
 
-  const recentCollections = [...collections].sort((a, b) =>
-    b.updatedAt.localeCompare(a.updatedAt),
-  );
   const pinnedItems = items.filter((item) => item.isPinned);
   const recentItems = items
     .filter((item) => !item.isPinned)
@@ -42,7 +45,7 @@ export default function DashboardPage() {
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          {items.length} items · {collections.length} collections
+          {items.length} items · {recentCollections.length} collections
         </p>
       </div>
 
@@ -51,7 +54,7 @@ export default function DashboardPage() {
         <StatCard label="Items" value={items.length} icon={Boxes} />
         <StatCard
           label="Collections"
-          value={collections.length}
+          value={recentCollections.length}
           icon={FolderOpen}
         />
         <StatCard
