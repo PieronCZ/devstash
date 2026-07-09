@@ -119,3 +119,58 @@ export async function getItemStats(): Promise<{
   ]);
   return { total, favorites };
 }
+
+// A system item type as shown in the sidebar's Types list.
+export interface SidebarItemType {
+  id: string;
+  name: string; // lowercase, used for the /items/[name] route
+  icon: string; // lucide icon name
+  color: string; // hex
+  count: number; // items of this type owned by the current (demo) user
+}
+
+// Stable display order for the built-in system types; anything unknown is
+// appended after these in name order.
+const SYSTEM_TYPE_ORDER = [
+  "snippet",
+  "prompt",
+  "command",
+  "note",
+  "link",
+  "file",
+  "image",
+];
+
+// System item types with the current (demo) user's per-type item counts, for
+// the sidebar's Types list. Ordered to match the product's canonical listing.
+export async function getSidebarItemTypes(): Promise<SidebarItemType[]> {
+  const types = await prisma.itemType.findMany({
+    where: { isSystem: true },
+    select: {
+      id: true,
+      name: true,
+      icon: true,
+      color: true,
+      _count: {
+        select: { items: { where: { user: { email: DEMO_EMAIL } } } },
+      },
+    },
+  });
+
+  return types
+    .map((type) => ({
+      id: type.id,
+      name: type.name,
+      icon: type.icon,
+      color: type.color,
+      count: type._count.items,
+    }))
+    .sort((a, b) => {
+      const ai = SYSTEM_TYPE_ORDER.indexOf(a.name);
+      const bi = SYSTEM_TYPE_ORDER.indexOf(b.name);
+      if (ai !== -1 && bi !== -1) return ai - bi;
+      if (ai !== -1) return -1;
+      if (bi !== -1) return 1;
+      return a.name.localeCompare(b.name);
+    });
+}

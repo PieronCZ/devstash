@@ -37,6 +37,7 @@ type SeedCollection = {
   name: string;
   description: string;
   defaultType: string;
+  favorite?: boolean;
   items: SeedItem[];
 };
 
@@ -45,6 +46,7 @@ const COLLECTIONS: SeedCollection[] = [
     name: "React Patterns",
     description: "Reusable React patterns and hooks",
     defaultType: "snippet",
+    favorite: true,
     items: [
       {
         type: "snippet",
@@ -109,6 +111,7 @@ export function cn(...inputs: ClassValue[]) {
     name: "AI Workflows",
     description: "AI prompts and workflow automations",
     defaultType: "prompt",
+    favorite: true,
     items: [
       {
         type: "prompt",
@@ -233,6 +236,7 @@ CMD ["npm", "start"]`,
     name: "Design Resources",
     description: "UI/UX resources and references",
     defaultType: "link",
+    favorite: true,
     items: [
       {
         type: "link",
@@ -310,6 +314,7 @@ async function main() {
       data: {
         name: col.name,
         description: col.description,
+        isFavorite: col.favorite ?? false,
         userId: user.id,
         defaultTypeId: typesByName.get(col.defaultType),
       },

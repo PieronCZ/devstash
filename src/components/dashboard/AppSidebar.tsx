@@ -6,20 +6,17 @@ import { usePathname } from "next/navigation";
 import {
   Boxes,
   ChevronRight,
+  Circle,
   Clock,
-  Folder,
   Plus,
   Settings,
   Sparkles,
   Star,
 } from "lucide-react";
 
-import {
-  collections,
-  currentUser,
-  itemTypes,
-  type Collection,
-} from "@/lib/mock-data";
+import { currentUser } from "@/lib/mock-data";
+import type { SidebarItemType } from "@/lib/db/items";
+import type { SidebarCollection } from "@/lib/db/collections";
 import { getTypeIcon } from "@/lib/icons";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -51,14 +48,6 @@ const mainNav = [
   { title: "Recent", href: "/recent", icon: Clock },
 ];
 
-// Accent color for a collection, taken from its default item type.
-function collectionColor(collection: Collection): string {
-  return (
-    itemTypes.find((type) => type.id === collection.defaultTypeId)?.color ??
-    "currentColor"
-  );
-}
-
 function initials(name: string): string {
   return name
     .split(" ")
@@ -68,28 +57,40 @@ function initials(name: string): string {
     .toUpperCase();
 }
 
-export function AppSidebar() {
+interface AppSidebarProps {
+  itemTypes: SidebarItemType[];
+  collections: {
+    favorites: SidebarCollection[];
+    recent: SidebarCollection[];
+  };
+}
+
+export function AppSidebar({ itemTypes, collections }: AppSidebarProps) {
   const pathname = usePathname();
   const [collectionsOpen, setCollectionsOpen] = useState(true);
-
-  const favoriteCollections = collections.filter(
-    (collection) => collection.isFavorite,
-  );
-  const recentCollections = [...collections]
-    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
-    .slice(0, 4);
 
   const isActive = (href: string) =>
     href === "/dashboard" ? pathname === href : pathname.startsWith(href);
 
-  const renderCollection = (collection: Collection) => (
+  const renderCollection = (
+    collection: SidebarCollection,
+    variant: "favorite" | "recent",
+  ) => (
     <SidebarMenuItem key={collection.id}>
       <SidebarMenuButton
         isActive={isActive(`/collections/${collection.id}`)}
         tooltip={collection.name}
         render={<Link href={`/collections/${collection.id}`} />}
       >
-        <Folder style={{ color: collectionColor(collection) }} />
+        {variant === "favorite" ? (
+          <Star className="fill-amber-400 text-amber-400" />
+        ) : (
+          // Colored circle keyed to the collection's most-used item type.
+          <Circle
+            className="fill-current"
+            style={{ color: collection.accentColor }}
+          />
+        )}
         <span>{collection.name}</span>
       </SidebarMenuButton>
     </SidebarMenuItem>
@@ -142,23 +143,19 @@ export function AppSidebar() {
             <SidebarMenu>
               {itemTypes.map((type) => {
                 const Icon = getTypeIcon(type.icon);
+                const href = `/items/${type.name}`;
                 return (
                   <SidebarMenuItem key={type.id}>
                     <SidebarMenuButton
-                      isActive={isActive(type.route)}
+                      isActive={isActive(href)}
                       tooltip={type.name}
-                      render={<Link href={type.route} />}
+                      render={<Link href={href} />}
                     >
                       <Icon style={{ color: type.color }} />
-                      <span>{type.name}</span>
+                      <span className="capitalize">{type.name}</span>
                     </SidebarMenuButton>
-                    {type.isPro ? (
-                      <SidebarMenuBadge className="right-9 rounded-sm bg-sidebar-accent px-1 text-[10px] tracking-wide text-sidebar-foreground/60">
-                        PRO
-                      </SidebarMenuBadge>
-                    ) : null}
                     <SidebarMenuBadge className="text-sidebar-foreground/45">
-                      {type.itemCount}
+                      {type.count}
                     </SidebarMenuBadge>
                   </SidebarMenuItem>
                 );
@@ -200,14 +197,18 @@ export function AppSidebar() {
                   Favorites
                 </p>
                 <SidebarMenu>
-                  {favoriteCollections.map(renderCollection)}
+                  {collections.favorites.map((collection) =>
+                    renderCollection(collection, "favorite"),
+                  )}
                 </SidebarMenu>
 
                 <p className="px-2 pt-3 pb-0.5 text-[11px] font-medium uppercase tracking-wider text-sidebar-foreground/45 group-data-[collapsible=icon]:hidden">
                   Recent
                 </p>
                 <SidebarMenu>
-                  {recentCollections.map(renderCollection)}
+                  {collections.recent.map((collection) =>
+                    renderCollection(collection, "recent"),
+                  )}
                 </SidebarMenu>
 
                 <SidebarMenu className="mt-1">
