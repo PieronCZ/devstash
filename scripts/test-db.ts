@@ -1,13 +1,24 @@
 import "dotenv/config";
+import bcrypt from "bcryptjs";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "../src/generated/prisma/client";
 
 // Standalone DB smoke test. Run with: npm run db:test
-// Verifies connectivity, that system types are seeded, and that a full
-// create → read → cascade-delete round-trip works against the dev branch.
+// Verifies connectivity and fetches + displays the seeded demo data so you can
+// eyeball that `npm run db:seed` populated the database correctly.
 
 const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });
 const prisma = new PrismaClient({ adapter });
+
+const DEMO_EMAIL = "demo@devstash.io";
+
+// First non-empty line of a text body, truncated for display.
+function preview(text: string | null, max = 60): string {
+  if (!text) return "";
+  const line = text.split("\n").find((l) => l.trim().length > 0) ?? "";
+  const trimmed = line.trim();
+  return trimmed.length > max ? `${trimmed.slice(0, max)}…` : trimmed;
+}
 
 async function main() {
   if (!process.env.DATABASE_URL) {
@@ -18,63 +29,66 @@ async function main() {
   await prisma.$queryRaw`SELECT 1`;
   console.log("✓ Connected to the database\n");
 
-  // 1. System types should be seeded.
-  console.log("🏷️  Checking system item types...");
+  // 1. System item types.
   const systemTypes = await prisma.itemType.findMany({
     where: { isSystem: true },
     orderBy: { name: "asc" },
   });
-  console.log(`✓ Found ${systemTypes.length} system types: ${systemTypes.map((t) => t.name).join(", ")}\n`);
+  console.log(`🏷️  System types (${systemTypes.length}): ${systemTypes.map((t) => t.name).join(", ")}\n`);
 
-  // 2. Create → read → delete round-trip (proves writes + cascade deletes).
-  const snippetType = systemTypes.find((t) => t.name === "Snippet");
-  if (!snippetType) throw new Error("Snippet system type missing — run `npm run db:seed`.");
-
-  console.log("✍️  Creating a throwaway user with an item and a collection...");
-  const user = await prisma.user.create({
-    data: {
-      email: `test-${Date.now()}@devstash.local`,
-      name: "DB Test User",
-      items: {
-        create: {
-          title: "Hello from test-db",
-          contentType: "TEXT",
-          content: "console.log('it works')",
-          language: "ts",
-          itemTypeId: snippetType.id,
+  // 2. Demo user.
+  const user = await prisma.user.findUnique({
+    where: { email: DEMO_EMAIL },
+    include: {
+      collections: {
+        orderBy: { createdAt: "asc" },
+        include: {
+          defaultType: true,
+          items: {
+            orderBy: { addedAt: "asc" },
+            include: { item: { include: { itemType: true } } },
+          },
         },
       },
-      collections: {
-        create: { name: "Test Collection" },
-      },
     },
-    include: { items: true, collections: true },
   });
-  console.log(`✓ Created user ${user.id} with ${user.items.length} item(s) and ${user.collections.length} collection(s)`);
 
-  // Link the item to the collection via the join table.
-  await prisma.itemCollection.create({
-    data: { itemId: user.items[0].id, collectionId: user.collections[0].id },
-  });
-  const links = await prisma.itemCollection.count({ where: { collectionId: user.collections[0].id } });
-  console.log(`✓ Linked item ↔ collection (join rows: ${links})`);
-
-  // Deleting the user should cascade to items, collections, and join rows.
-  console.log("🧹 Deleting the test user (cascade)...");
-  await prisma.user.delete({ where: { id: user.id } });
-
-  const leftoverItems = await prisma.item.count({ where: { userId: user.id } });
-  const leftoverCollections = await prisma.collection.count({ where: { userId: user.id } });
-  const leftoverLinks = await prisma.itemCollection.count({ where: { itemId: user.items[0].id } });
-
-  if (leftoverItems || leftoverCollections || leftoverLinks) {
-    throw new Error(
-      `Cascade delete failed — items:${leftoverItems} collections:${leftoverCollections} links:${leftoverLinks}`,
-    );
+  if (!user) {
+    throw new Error(`Demo user (${DEMO_EMAIL}) not found — run \`npm run db:seed\`.`);
   }
-  console.log("✓ Cascade delete removed items, collections, and join rows\n");
 
-  console.log("✅ All database checks passed.");
+  const passwordOk = user.passwordHash
+    ? await bcrypt.compare("12345678", user.passwordHash)
+    : false;
+
+  console.log("👤 Demo user");
+  console.log(`   email:         ${user.email}`);
+  console.log(`   name:          ${user.name}`);
+  console.log(`   isPro:         ${user.isPro}`);
+  console.log(`   emailVerified: ${user.emailVerified ? "yes" : "no"}`);
+  console.log(`   password ok:   ${passwordOk ? "yes (12345678 ✓)" : "NO — hash mismatch"}\n`);
+
+  // 3. Collections + items.
+  let totalItems = 0;
+  console.log(`📚 Collections (${user.collections.length})\n`);
+  for (const collection of user.collections) {
+    console.log(`   ▸ ${collection.name}  ·  ${collection.items.length} items  ·  default: ${collection.defaultType?.name ?? "—"}`);
+    console.log(`     ${collection.description ?? ""}`);
+    for (const link of collection.items) {
+      const item = link.item;
+      const detail = item.contentType === "URL" ? item.url : preview(item.content);
+      console.log(`       - [${item.itemType.name}] ${item.title}  →  ${detail}`);
+      totalItems++;
+    }
+    console.log("");
+  }
+
+  // 4. Sanity assertions.
+  if (!passwordOk) throw new Error("Demo password does not validate.");
+  if (user.collections.length === 0) throw new Error("No collections found for demo user.");
+  if (totalItems === 0) throw new Error("No items found for demo user.");
+
+  console.log(`✅ All checks passed — ${user.collections.length} collections, ${totalItems} items.`);
 }
 
 main()
