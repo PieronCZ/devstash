@@ -7,6 +7,7 @@
 - Ask before large refactors or architectural changes
 - Don't add features not in the project spec
 - Never delete files without clarification
+- if you are implementing new feature or doing something that requires more sophisticated steps, always show Update Todos that will show steps you are going to do. And after everything is done, the steps will be green-checked.
 
 ## Workflow
 
