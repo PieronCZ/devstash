@@ -42,7 +42,6 @@ import {
   SidebarMenuBadge,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarTrigger,
 } from "@/components/ui/sidebar";
 
 // Primary navigation shown above the type list.
@@ -98,21 +97,19 @@ export function AppSidebar() {
 
   return (
     <Sidebar collapsible="icon">
-      <SidebarHeader>
-        <div className="flex items-center justify-between gap-2">
-          <Link
-            href="/dashboard"
-            className="flex items-center gap-2 overflow-hidden rounded-md p-1 font-semibold text-sidebar-accent-foreground"
-          >
-            <span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-sidebar-primary text-sidebar-primary-foreground">
-              <Boxes className="size-4" />
-            </span>
-            <span className="truncate group-data-[collapsible=icon]:hidden">
-              DevStash
-            </span>
-          </Link>
-          <SidebarTrigger className="group-data-[collapsible=icon]:hidden" />
-        </div>
+      {/* Height matched to the TopBar so the logo lines up with the search bar. */}
+      <SidebarHeader className="h-16 flex-row items-center">
+        <Link
+          href="/dashboard"
+          className="flex items-center gap-2 overflow-hidden rounded-md p-1 font-semibold text-sidebar-accent-foreground"
+        >
+          <span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-sidebar-primary text-sidebar-primary-foreground">
+            <Boxes className="size-4" />
+          </span>
+          <span className="truncate group-data-[collapsible=icon]:hidden">
+            DevStash
+          </span>
+        </Link>
       </SidebarHeader>
 
       <SidebarContent>
