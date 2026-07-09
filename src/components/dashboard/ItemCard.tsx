@@ -1,13 +1,13 @@
 import { createElement } from "react";
 import { Pin, Star } from "lucide-react";
 
-import { itemTypes, type Item } from "@/lib/mock-data";
+import type { DashboardItem } from "@/lib/db/items";
 import { getTypeIcon } from "@/lib/icons";
 import { formatFileSize } from "@/lib/format";
 
 // Type-appropriate preview: code block for languaged text, prose for notes/
 // prompts, the URL for links, and name · size for files.
-function ItemPreview({ item }: { item: Item }) {
+function ItemPreview({ item }: { item: DashboardItem }) {
   if (item.contentType === "FILE") {
     return (
       <p className="text-sm text-muted-foreground">
@@ -36,12 +36,11 @@ function ItemPreview({ item }: { item: Item }) {
   );
 }
 
-export function ItemCard({ item }: { item: Item }) {
-  const type = itemTypes.find((t) => t.id === item.typeId);
-  const color = type?.color ?? "currentColor";
-  const icon = getTypeIcon(type?.icon ?? "File");
-  // Type names are stored plural ("Snippets"); the card label is singular.
-  const label = type?.name.replace(/s$/, "") ?? "Item";
+export function ItemCard({ item }: { item: DashboardItem }) {
+  const { color, icon: iconName, name } = item.type;
+  const icon = getTypeIcon(iconName);
+  // Type names are stored singular ("snippet"); the CSS uppercases the label.
+  const label = name;
 
   return (
     <div

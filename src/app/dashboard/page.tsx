@@ -1,8 +1,8 @@
 import type { LucideIcon } from "lucide-react";
 import { Boxes, Clock, FolderHeart, FolderOpen, LayoutGrid, Pin, Star } from "lucide-react";
 
-import { items } from "@/lib/mock-data";
 import { getRecentCollections } from "@/lib/db/collections";
+import { getItemStats, getPinnedItems, getRecentItems } from "@/lib/db/items";
 import { CollectionCard } from "@/components/dashboard/CollectionCard";
 import { ItemCard } from "@/components/dashboard/ItemCard";
 import { StatCard } from "@/components/dashboard/StatCard";
@@ -26,18 +26,17 @@ function SectionHeader({
 }
 
 export default async function DashboardPage() {
-  const recentCollections = await getRecentCollections();
+  const [recentCollections, itemStats, pinnedItems, recentItems] =
+    await Promise.all([
+      getRecentCollections(),
+      getItemStats(),
+      getPinnedItems(),
+      getRecentItems(10),
+    ]);
 
-  const favoriteItems = items.filter((item) => item.isFavorite);
   const favoriteCollections = recentCollections.filter(
     (collection) => collection.isFavorite,
   );
-
-  const pinnedItems = items.filter((item) => item.isPinned);
-  const recentItems = items
-    .filter((item) => !item.isPinned)
-    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
-    .slice(0, 10);
 
   return (
     <div className="space-y-8">
@@ -45,13 +44,13 @@ export default async function DashboardPage() {
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          {items.length} items · {recentCollections.length} collections
+          {itemStats.total} items · {recentCollections.length} collections
         </p>
       </div>
 
       {/* Stats */}
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-        <StatCard label="Items" value={items.length} icon={Boxes} />
+        <StatCard label="Items" value={itemStats.total} icon={Boxes} />
         <StatCard
           label="Collections"
           value={recentCollections.length}
@@ -59,7 +58,7 @@ export default async function DashboardPage() {
         />
         <StatCard
           label="Favorite items"
-          value={favoriteItems.length}
+          value={itemStats.favorites}
           icon={Star}
         />
         <StatCard
