@@ -28,12 +28,14 @@ export function SignInForm({ callbackUrl }: SignInFormProps) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [unverified, setUnverified] = useState(false);
   const [pending, setPending] = useState(false);
   const [githubPending, setGithubPending] = useState(false);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
+    setUnverified(false);
 
     const parsed = credentialsSchema.safeParse({ email, password });
     if (!parsed.success) {
@@ -49,7 +51,13 @@ export function SignInForm({ callbackUrl }: SignInFormProps) {
     });
 
     if (result?.error) {
-      setError("Invalid email or password.");
+      // Correct password but unverified email — point them to verification
+      // rather than the generic invalid-credentials message.
+      if (result.code === "email_not_verified") {
+        setUnverified(true);
+      } else {
+        setError("Invalid email or password.");
+      }
       setPending(false);
       return;
     }
@@ -119,6 +127,22 @@ export function SignInForm({ callbackUrl }: SignInFormProps) {
           <p className="text-sm text-destructive" role="alert">
             {error}
           </p>
+        ) : null}
+
+        {unverified ? (
+          <div
+            className="rounded-lg border border-border bg-muted/50 px-3 py-2 text-sm text-muted-foreground"
+            role="alert"
+          >
+            Please verify your email before signing in.{" "}
+            <Link
+              href={`/check-email?email=${encodeURIComponent(email)}`}
+              className="font-medium text-foreground underline-offset-4 hover:underline"
+            >
+              Resend the link
+            </Link>
+            .
+          </div>
         ) : null}
 
         <Button type="submit" className="w-full" disabled={pending || githubPending}>

@@ -1,4 +1,4 @@
-import NextAuth from "next-auth";
+import NextAuth, { CredentialsSignin } from "next-auth";
 import GitHub from "next-auth/providers/github";
 import Credentials from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
@@ -6,6 +6,13 @@ import { PrismaAdapter } from "@auth/prisma-adapter";
 import { prisma } from "@/lib/prisma";
 import authConfig from "@/auth.config";
 import { credentialsSchema } from "@/lib/validations/auth";
+
+// Thrown when the password is correct but the account's email isn't verified.
+// The `code` is surfaced to the client so the sign-in form can prompt the user
+// to check their inbox / resend the link (rather than a generic error).
+class EmailNotVerifiedError extends CredentialsSignin {
+  code = "email_not_verified";
+}
 
 // Full config used throughout the app (server components, route handlers,
 // server actions). Adds the Prisma adapter and the JWT session strategy on top
@@ -35,6 +42,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
         const passwordMatches = await bcrypt.compare(password, user.passwordHash);
         if (!passwordMatches) return null;
+
+        // Block sign-in until the email is verified (credentials accounts only;
+        // GitHub OAuth accounts are provider-verified and never hit this path).
+        if (!user.emailVerified) throw new EmailNotVerifiedError();
 
         return { id: user.id, name: user.name, email: user.email, image: user.image };
       },

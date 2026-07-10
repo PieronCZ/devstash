@@ -3,6 +3,8 @@ import bcrypt from "bcryptjs";
 import { Prisma } from "@/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
 import { registerSchema } from "@/lib/validations/auth";
+import { createVerificationToken } from "@/lib/tokens";
+import { sendVerificationEmail } from "@/lib/email";
 
 // Matches the seed script's cost factor so hashes are consistent across sources.
 const BCRYPT_ROUNDS = 12;
@@ -40,6 +42,16 @@ export async function POST(request: Request) {
       data: { name, email, passwordHash },
       select: { id: true, name: true, email: true },
     });
+
+    // Issue a verification token and email the link. If the email fails we
+    // still report success (the account exists) — the user can request a new
+    // link from the "check your email" page.
+    try {
+      const token = await createVerificationToken(email);
+      await sendVerificationEmail(email, token, new URL(request.url).origin);
+    } catch (emailErr) {
+      console.error("Failed to send verification email:", emailErr);
+    }
 
     return NextResponse.json({ user }, { status: 201 });
   } catch (err) {
