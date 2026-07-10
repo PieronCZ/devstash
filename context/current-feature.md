@@ -1,27 +1,16 @@
-# Current Feature: Auth Credentials — Email/Password Provider (Phase 2)
+# Current Feature
 
 ## Status
 
-In Progress
+Not Started
 
 ## Goals
 
-- Add a Credentials provider for email/password authentication with registration
-- `auth.config.ts`: add Credentials provider with `authorize: () => null` placeholder (edge-safe, keeps split pattern intact)
-- `auth.ts`: override the Credentials provider with real bcryptjs validation logic
-- Create a registration API route at `POST /api/auth/register` (accepts name, email, password, confirmPassword)
-- Registration validates passwords match, rejects duplicate users, bcrypt-hashes the password, creates the user, returns a success/error response
-- Ensure `passwordHash` exists on `User` (already added in the Seed Sample Data migration — verify, add via migration only if missing)
-- GitHub OAuth continues to work; email/password sign-in redirects to `/dashboard`
+<!-- Bullet points of what success looks like -->
 
 ## Notes
 
-- **Split pattern:** Credentials must be declared in both files — placeholder (`authorize: () => null`) in the edge-safe `auth.config.ts`, real bcrypt logic layered in the Node-runtime `auth.ts`. bcryptjs can't run on the edge.
-- bcryptjs is already installed; `passwordHash String?` already exists on `User` (migration `add_user_password_hash`) — no new migration expected.
-- Reuse the existing `@/lib/prisma` singleton for the register route and `authorize`.
-- Validate register input with Zod per coding standards.
-- Testing: curl the register route, then sign in at `/api/auth/signin` with the created credentials, verify `/dashboard` redirect, and confirm GitHub OAuth still works.
-- Reference: Credentials provider — https://authjs.dev/getting-started/authentication/credentials
+<!-- Additional context, constraints, or details from spec -->
 
 ## History
 
@@ -41,3 +30,4 @@ In Progress
 **Add Pro Badge to Sidebar** - Reintroduced the PRO badge (dropped during the DB migration) on the `file` and `image` item types in the sidebar. Added the shadcn `Badge` component (`base-nova` style) and a `PRO_TYPES` set in `AppSidebar`; PRO-gated rows render a clean, subtle, uppercase badge with a violet→reddish gradient (`#8b5cf6` → `#ec4899`, reused from the `prompt`/`image` type colors) at the end of the row before the count. Uses the `outline` variant (no bg-color under the gradient), `border-0`/`text-white`, and hides on the collapsed icon rail. Static badge (no DB `isPro` field); build passes.
 **Scan Quick Wins** - Low/no-risk cleanups surfaced by the `code-scanner` subagent, plus dashboard `loading`/`error` UI. (1) **Composite indexes** for common filter+sort patterns via a Prisma migration (`add_item_collection_composite_indexes`): `@@index([userId, isPinned, updatedAt])` on `Item` and `@@index([userId, updatedAt])` on `Collection` (additive, index-only; migration-only per DB rules, dev in sync). (2) **Single source of truth for system-type metadata** — new `src/lib/item-types.ts` exports `SYSTEM_TYPE_ORDER` (typed `readonly string[]` so `.indexOf(name)` typechecks) and `PRO_TYPES`; `src/lib/db/items.ts` and `AppSidebar` now import them instead of each declaring their own. Pure refactor, no behavior change. (3) **Removed redundant `export const dynamic = "force-dynamic"`** from `dashboard/page.tsx` — the layout's `cookies()` already forces dynamic rendering (build confirms `/dashboard` stays `ƒ`). (4) **Dashboard `loading.tsx`** skeleton mirroring the page layout (header, 4 stats, collections grid, recent items grid) and **`error.tsx`** client error boundary with a `reset()` retry button (logs via `useEffect`, ready for a reporter). Deferred to a follow-up: splitting `AppSidebar` into subcomponents and bounding/`groupBy`-ing `getRecentCollections`. Lint + `tsc` clean; production build passes.
 **Auth Setup — NextAuth v5 + GitHub Provider** (2026-07-10) - Phase 1 of auth: NextAuth v5 (`next-auth@^5.0.0-beta.31`) + `@auth/prisma-adapter` using the split, edge-safe config pattern. New `src/auth.config.ts` (adapter-free, GitHub provider only) and `src/auth.ts` (Prisma adapter over the existing `@/lib/prisma` singleton, `session.strategy: "jwt"`, `jwt`/`session` callbacks that carry `user.id`), re-exported through the route handler `src/app/api/auth/[...nextauth]/route.ts`. Route protection via the Next.js 16 proxy `src/proxy.ts` — a second adapter-free `NextAuth(authConfig)` instance, named `export const proxy = auth(...)`, `matcher: ["/dashboard/:path*"]`, redirecting unauthenticated dashboard hits to NextAuth's default sign-in page with a `callbackUrl`. Extended `Session.user.id` + `JWT.id` in `src/types/next-auth.d.ts`. No custom auth UI yet (default pages). Verified: production build passes with `/api/auth/[...nextauth]` and the proxy registered; `GET /dashboard` → 302 → `/api/auth/signin?callbackUrl=%2Fdashboard`, `/api/auth/providers` lists GitHub, sign-in page 200, home stays public. GitHub OAuth round-trip left for manual browser check. Phase-2 (credentials/email-password) and phase-3 (custom sign-in/register/sign-out UI) specs staged under `context/features/` for later.
+**Auth Credentials — Email/Password Provider** (2026-07-10) - Phase 2 of auth: a Credentials provider alongside GitHub, via the split edge-safe pattern. `auth.config.ts` gains a Credentials **placeholder** (`authorize: () => null`) so the edge proxy sees the provider without bcrypt/Prisma; `auth.ts` layers the real `authorize` (Node) — Zod-validates, looks up the user, rejects unknown/OAuth-only accounts (no `passwordHash`), and `bcrypt.compare`s the hash. New `src/lib/validations/auth.ts` holds shared Zod schemas (`credentialsSchema`, `registerSchema` with confirm-match) and an `emailSchema` normalized (trim/lowercase) on both write and lookup. New `POST /api/auth/register`: Zod-validated (400), rejects duplicates (409, incl. Prisma `P2002` race → 409, other errors → 500), hashes at 12 rounds (matches seed), creates the user with a `select` that omits `passwordHash`. Promoted `zod` to a direct dependency. No migration — `passwordHash` already on `User`. Verified live: providers lists credentials + github; register returns 201/409/400; full CSRF sign-in yields a session with `user.id`, wrong password yields none. Lint + `tsc` + build pass. No custom auth UI yet — deferred to phase 3.
