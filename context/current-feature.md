@@ -1,18 +1,16 @@
 # Current Feature
 
-<!-- Feature name and short description -->
-
 ## Status
 
-<!-- Not Started | In Progress | Completed -->
+Not Started
 
 ## Goals
 
-<!-- Goals and requirements -->
+<!-- Bullet points of what success looks like -->
 
 ## Notes
 
-<!-- Any extra notes -->
+<!-- Additional context, constraints, or details from spec -->
 
 ## History
 
@@ -31,3 +29,4 @@
 **Stats & Sidebar** - Moved the sidebar off mock data onto live DB reads, finishing the dashboard's migration off `src/lib/mock-data.ts` (only the footer user card remains on mock until auth lands). New `getSidebarItemTypes()` in `src/lib/db/items.ts` returns the system item types with per-user item counts (filtered `_count`), sorted into the canonical order (snippet, prompt, command, note, link, file, image); new `getSidebarCollections()` in `src/lib/db/collections.ts` returns `{ favorites, recent }`, each with the accent color from its most-used item type (falling back to `defaultType`). `AppSidebar` now takes `itemTypes` + `collections` as props (fetched in `dashboard/layout.tsx` via `Promise.all`): types link to `/items/[name]` with live counts (PRO badge dropped — no such field in the DB), favorites render a star, recents render a colored circle keyed to the accent color, and the "View all collections" link points at `/collections`. Also seeded three favorite collections (React Patterns, AI Workflows, Design Resources) via a new optional `favorite` flag on the seed shape wired to `isFavorite`.
 **Add Pro Badge to Sidebar** - Reintroduced the PRO badge (dropped during the DB migration) on the `file` and `image` item types in the sidebar. Added the shadcn `Badge` component (`base-nova` style) and a `PRO_TYPES` set in `AppSidebar`; PRO-gated rows render a clean, subtle, uppercase badge with a violet→reddish gradient (`#8b5cf6` → `#ec4899`, reused from the `prompt`/`image` type colors) at the end of the row before the count. Uses the `outline` variant (no bg-color under the gradient), `border-0`/`text-white`, and hides on the collapsed icon rail. Static badge (no DB `isPro` field); build passes.
 **Scan Quick Wins** - Low/no-risk cleanups surfaced by the `code-scanner` subagent, plus dashboard `loading`/`error` UI. (1) **Composite indexes** for common filter+sort patterns via a Prisma migration (`add_item_collection_composite_indexes`): `@@index([userId, isPinned, updatedAt])` on `Item` and `@@index([userId, updatedAt])` on `Collection` (additive, index-only; migration-only per DB rules, dev in sync). (2) **Single source of truth for system-type metadata** — new `src/lib/item-types.ts` exports `SYSTEM_TYPE_ORDER` (typed `readonly string[]` so `.indexOf(name)` typechecks) and `PRO_TYPES`; `src/lib/db/items.ts` and `AppSidebar` now import them instead of each declaring their own. Pure refactor, no behavior change. (3) **Removed redundant `export const dynamic = "force-dynamic"`** from `dashboard/page.tsx` — the layout's `cookies()` already forces dynamic rendering (build confirms `/dashboard` stays `ƒ`). (4) **Dashboard `loading.tsx`** skeleton mirroring the page layout (header, 4 stats, collections grid, recent items grid) and **`error.tsx`** client error boundary with a `reset()` retry button (logs via `useEffect`, ready for a reporter). Deferred to a follow-up: splitting `AppSidebar` into subcomponents and bounding/`groupBy`-ing `getRecentCollections`. Lint + `tsc` clean; production build passes.
+**Auth Setup — NextAuth v5 + GitHub Provider** (2026-07-10) - Phase 1 of auth: NextAuth v5 (`next-auth@^5.0.0-beta.31`) + `@auth/prisma-adapter` using the split, edge-safe config pattern. New `src/auth.config.ts` (adapter-free, GitHub provider only) and `src/auth.ts` (Prisma adapter over the existing `@/lib/prisma` singleton, `session.strategy: "jwt"`, `jwt`/`session` callbacks that carry `user.id`), re-exported through the route handler `src/app/api/auth/[...nextauth]/route.ts`. Route protection via the Next.js 16 proxy `src/proxy.ts` — a second adapter-free `NextAuth(authConfig)` instance, named `export const proxy = auth(...)`, `matcher: ["/dashboard/:path*"]`, redirecting unauthenticated dashboard hits to NextAuth's default sign-in page with a `callbackUrl`. Extended `Session.user.id` + `JWT.id` in `src/types/next-auth.d.ts`. No custom auth UI yet (default pages). Verified: production build passes with `/api/auth/[...nextauth]` and the proxy registered; `GET /dashboard` → 302 → `/api/auth/signin?callbackUrl=%2Fdashboard`, `/api/auth/providers` lists GitHub, sign-in page 200, home stays public. GitHub OAuth round-trip left for manual browser check. Phase-2 (credentials/email-password) and phase-3 (custom sign-in/register/sign-out UI) specs staged under `context/features/` for later.
