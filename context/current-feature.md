@@ -1,35 +1,18 @@
 # Current Feature
 
-**Scan Quick Wins** — Low/no-risk cleanups surfaced by the `code-scanner` subagent. Skips the higher-effort structural items (`AppSidebar` split, `getRecentCollections` rework) for a dedicated follow-up.
+<!-- Feature name and short description -->
 
 ## Status
 
-In Progress
+<!-- Not Started | In Progress | Completed -->
 
 ## Goals
 
-1. **Composite indexes for common filter+sort patterns** (DB change — Prisma conventions only)
-   - Add `@@index([userId, isPinned, updatedAt])` on `Item` and `@@index([userId, updatedAt])` on `Collection` in `prisma/schema.prisma`.
-   - Additive, index-only change — no data/column changes, safe to apply.
-   - **Must** go through a Prisma migration (`npm run db:migrate` → `prisma migrate dev`), never `db push` or raw SQL, so dev and production branches stay in sync. Deploy to prod with `npm run db:deploy` (`prisma migrate deploy`).
-
-2. **Consolidate duplicated type metadata into a single source of truth**
-   - Create `src/lib/item-types.ts` exporting the canonical system-type order and the Pro-gated type set.
-   - Replace `SYSTEM_TYPE_ORDER` in `src/lib/db/items.ts` and `PRO_TYPES` in `src/components/dashboard/AppSidebar.tsx` with imports from it.
-   - Pure refactor, no behavior change.
-
-3. **Remove redundant `force-dynamic`**
-   - Drop `export const dynamic = "force-dynamic"` in `src/app/dashboard/page.tsx` — the layout's `cookies()` call already makes the route dynamic, so it's a no-op.
-
-4. **Add Next.js `loading` + `error` UI for the dashboard**
-   - `src/app/dashboard/loading.tsx` — skeleton mirroring the page layout (header, 4 stats, collections grid, recent items grid) shown while the server component awaits its DB reads.
-   - `src/app/dashboard/error.tsx` — route-level error boundary (`"use client"`) with a `reset()` retry button for failed DB reads/renders.
+<!-- Goals and requirements -->
 
 ## Notes
 
-- All three are low-risk; verify with `npm run build` (stop `npm run dev` first) and a quick `npm run lint`.
-- After the migration, run `npx prisma migrate status` to confirm dev is in sync before committing.
-- Deferred (not part of this feature): splitting `AppSidebar` into subcomponents, and bounding/`groupBy`-ing `getRecentCollections`.
+<!-- Any extra notes -->
 
 ## History
 
@@ -47,3 +30,4 @@ In Progress
 **Dashboard Items** - Replaced the dashboard's dummy pinned/recent item data with live DB reads via Prisma, completing the dashboard's move off `src/lib/mock-data.ts`. New `src/lib/db/items.ts` exposes a `DashboardItem` shape (resolved `type` icon/color/name + tags) and three functions: `getPinnedItems()` and `getRecentItems(limit = 10)` (both newest-first, filtered by `isPinned`) and `getItemStats()` (parallel `count` queries for total + favorites). `ItemCard` now consumes `DashboardItem` and derives its icon/left-border/label from `item.type` instead of a mock lookup; per-type previews and tag chips unchanged. `/dashboard` fetches collections + item stats + pinned + recent in one `Promise.all`, with the header count, Items stat, and Favorite-items stat now DB-sourced; the Pinned section stays hidden when there are no pins. Scoped to `demo@devstash.io` until auth lands. (`mock-data.ts` remains only for the sidebar's item types/user.)
 **Stats & Sidebar** - Moved the sidebar off mock data onto live DB reads, finishing the dashboard's migration off `src/lib/mock-data.ts` (only the footer user card remains on mock until auth lands). New `getSidebarItemTypes()` in `src/lib/db/items.ts` returns the system item types with per-user item counts (filtered `_count`), sorted into the canonical order (snippet, prompt, command, note, link, file, image); new `getSidebarCollections()` in `src/lib/db/collections.ts` returns `{ favorites, recent }`, each with the accent color from its most-used item type (falling back to `defaultType`). `AppSidebar` now takes `itemTypes` + `collections` as props (fetched in `dashboard/layout.tsx` via `Promise.all`): types link to `/items/[name]` with live counts (PRO badge dropped — no such field in the DB), favorites render a star, recents render a colored circle keyed to the accent color, and the "View all collections" link points at `/collections`. Also seeded three favorite collections (React Patterns, AI Workflows, Design Resources) via a new optional `favorite` flag on the seed shape wired to `isFavorite`.
 **Add Pro Badge to Sidebar** - Reintroduced the PRO badge (dropped during the DB migration) on the `file` and `image` item types in the sidebar. Added the shadcn `Badge` component (`base-nova` style) and a `PRO_TYPES` set in `AppSidebar`; PRO-gated rows render a clean, subtle, uppercase badge with a violet→reddish gradient (`#8b5cf6` → `#ec4899`, reused from the `prompt`/`image` type colors) at the end of the row before the count. Uses the `outline` variant (no bg-color under the gradient), `border-0`/`text-white`, and hides on the collapsed icon rail. Static badge (no DB `isPro` field); build passes.
+**Scan Quick Wins** - Low/no-risk cleanups surfaced by the `code-scanner` subagent, plus dashboard `loading`/`error` UI. (1) **Composite indexes** for common filter+sort patterns via a Prisma migration (`add_item_collection_composite_indexes`): `@@index([userId, isPinned, updatedAt])` on `Item` and `@@index([userId, updatedAt])` on `Collection` (additive, index-only; migration-only per DB rules, dev in sync). (2) **Single source of truth for system-type metadata** — new `src/lib/item-types.ts` exports `SYSTEM_TYPE_ORDER` (typed `readonly string[]` so `.indexOf(name)` typechecks) and `PRO_TYPES`; `src/lib/db/items.ts` and `AppSidebar` now import them instead of each declaring their own. Pure refactor, no behavior change. (3) **Removed redundant `export const dynamic = "force-dynamic"`** from `dashboard/page.tsx` — the layout's `cookies()` already forces dynamic rendering (build confirms `/dashboard` stays `ƒ`). (4) **Dashboard `loading.tsx`** skeleton mirroring the page layout (header, 4 stats, collections grid, recent items grid) and **`error.tsx`** client error boundary with a `reset()` retry button (logs via `useEffect`, ready for a reporter). Deferred to a follow-up: splitting `AppSidebar` into subcomponents and bounding/`groupBy`-ing `getRecentCollections`. Lint + `tsc` clean; production build passes.
