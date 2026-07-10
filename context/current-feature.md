@@ -1,16 +1,30 @@
-# Current Feature
+# Current Feature: Email Verification on Register (Resend)
 
 ## Status
 
-Not Started
+In Progress
 
 ## Goals
 
-<!-- Bullet points of what success looks like -->
+- Registering no longer auto-signs the user in. Instead they land on a **"Check your email"** page telling them to click the verification link.
+- On successful registration, send a verification email via **Resend** (`RESEND_API_KEY` already in `.env`) containing a unique, expiring link.
+- Clicking the link verifies the account (sets `User.emailVerified`) and lands the user on a confirmation state, from which they can sign in.
+- Credentials sign-in **rejects unverified accounts** — a user with no `emailVerified` cannot log in, with a clear message pointing them to (re)verify.
+- Optional: a "resend verification email" affordance for users who didn't receive / expired the link.
+- `npm run build` passes; email + verification round-trip verified in the browser.
 
 ## Notes
 
-<!-- Additional context, constraints, or details from spec -->
+- **Provider:** Resend. Fetch current Resend + `next-auth` docs (context7) before wiring; don't guess the SDK surface. From-address/domain needs deciding (Resend onboarding sandbox vs. verified domain).
+- **Token storage:** the Prisma schema already has a `VerificationToken` model (`identifier`, `token`, `expires`, `@@unique([identifier, token])`) — reuse it rather than adding a new table. No migration expected unless we need extra fields. Confirm before migrating (DB rule: migrations only, dev → prod, never `db push`).
+- **Current flow to change:**
+  - [src/components/auth/RegisterForm.tsx](src/components/auth/RegisterForm.tsx) — after a 201 from register it currently calls `signIn("credentials", …)` then pushes `/dashboard` (lines 66–82). Replace the auto-sign-in with a redirect to the new "check your email" page.
+  - [src/app/api/auth/register/route.ts](src/app/api/auth/register/route.ts) — after `prisma.user.create` (currently sets no `emailVerified`), generate + persist a verification token and send the Resend email.
+  - [src/auth.ts](src/auth.ts) `authorize` (lines 26–40) — add an `emailVerified` gate so unverified credentials users can't sign in.
+- **New surface (to design during `start`):** an email-sending lib (e.g. `src/lib/email.ts`), a token helper (`src/lib/tokens.ts`), a `/verify-email` route/handler that validates the token + marks the user verified, and a `/check-email` (or similar) page.
+- **Scope:** applies to the **credentials** flow. GitHub OAuth accounts are already verified by the provider — don't force them through email verification.
+- Keep the existing register API response contract stable where possible; the form change is minimal (swap post-register navigation).
+- Custom types / build order: this extends the auth phases (phase 4-ish). Prior auth work is in History below.
 
 ## History
 

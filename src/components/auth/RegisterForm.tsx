@@ -3,7 +3,6 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { signIn } from "next-auth/react";
 import { LoaderCircle } from "lucide-react";
 
 import { registerSchema } from "@/lib/validations/auth";
@@ -63,23 +62,9 @@ export function RegisterForm() {
         return;
       }
 
-      // Account created — sign them in automatically with the same
-      // credentials so they land straight in the app.
-      const signInResult = await signIn("credentials", {
-        email: parsed.data.email,
-        password: parsed.data.password,
-        redirect: false,
-      });
-
-      if (signInResult?.error) {
-        // Rare: account exists but auto sign-in failed. Fall back to the
-        // sign-in page rather than leaving them stuck.
-        router.push("/sign-in?registered=1");
-        return;
-      }
-
-      router.push("/dashboard");
-      router.refresh();
+      // Account created — the user must verify their email before signing in.
+      // Send them to the "check your email" page instead of auto sign-in.
+      router.push(`/check-email?email=${encodeURIComponent(parsed.data.email)}`);
     } catch {
       setFormError("Something went wrong. Please try again.");
       setPending(false);
