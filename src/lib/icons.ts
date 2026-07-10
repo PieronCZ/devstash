@@ -1,5 +1,5 @@
-// Maps the lucide icon names stored on item types (see mock-data) to their
-// actual components, so data can reference icons by string.
+// Maps the lucide icon names stored on item types to their actual
+// components, so data can reference icons by string.
 
 import {
   Code,
