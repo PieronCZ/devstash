@@ -1,16 +1,27 @@
-# Current Feature
+# Current Feature: Auth Credentials — Email/Password Provider (Phase 2)
 
 ## Status
 
-Not Started
+In Progress
 
 ## Goals
 
-<!-- Bullet points of what success looks like -->
+- Add a Credentials provider for email/password authentication with registration
+- `auth.config.ts`: add Credentials provider with `authorize: () => null` placeholder (edge-safe, keeps split pattern intact)
+- `auth.ts`: override the Credentials provider with real bcryptjs validation logic
+- Create a registration API route at `POST /api/auth/register` (accepts name, email, password, confirmPassword)
+- Registration validates passwords match, rejects duplicate users, bcrypt-hashes the password, creates the user, returns a success/error response
+- Ensure `passwordHash` exists on `User` (already added in the Seed Sample Data migration — verify, add via migration only if missing)
+- GitHub OAuth continues to work; email/password sign-in redirects to `/dashboard`
 
 ## Notes
 
-<!-- Additional context, constraints, or details from spec -->
+- **Split pattern:** Credentials must be declared in both files — placeholder (`authorize: () => null`) in the edge-safe `auth.config.ts`, real bcrypt logic layered in the Node-runtime `auth.ts`. bcryptjs can't run on the edge.
+- bcryptjs is already installed; `passwordHash String?` already exists on `User` (migration `add_user_password_hash`) — no new migration expected.
+- Reuse the existing `@/lib/prisma` singleton for the register route and `authorize`.
+- Validate register input with Zod per coding standards.
+- Testing: curl the register route, then sign in at `/api/auth/signin` with the created credentials, verify `/dashboard` redirect, and confirm GitHub OAuth still works.
+- Reference: Credentials provider — https://authjs.dev/getting-started/authentication/credentials
 
 ## History
 
