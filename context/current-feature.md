@@ -1,30 +1,16 @@
-# Current Feature: Email Verification on Register (Resend)
+# Current Feature
 
 ## Status
 
-In Progress
+Not Started
 
 ## Goals
 
-- Registering no longer auto-signs the user in. Instead they land on a **"Check your email"** page telling them to click the verification link.
-- On successful registration, send a verification email via **Resend** (`RESEND_API_KEY` already in `.env`) containing a unique, expiring link.
-- Clicking the link verifies the account (sets `User.emailVerified`) and lands the user on a confirmation state, from which they can sign in.
-- Credentials sign-in **rejects unverified accounts** — a user with no `emailVerified` cannot log in, with a clear message pointing them to (re)verify.
-- Optional: a "resend verification email" affordance for users who didn't receive / expired the link.
-- `npm run build` passes; email + verification round-trip verified in the browser.
+<!-- Bullet points of what success looks like -->
 
 ## Notes
 
-- **Provider:** Resend. Fetch current Resend + `next-auth` docs (context7) before wiring; don't guess the SDK surface. From-address/domain needs deciding (Resend onboarding sandbox vs. verified domain).
-- **Token storage:** the Prisma schema already has a `VerificationToken` model (`identifier`, `token`, `expires`, `@@unique([identifier, token])`) — reuse it rather than adding a new table. No migration expected unless we need extra fields. Confirm before migrating (DB rule: migrations only, dev → prod, never `db push`).
-- **Current flow to change:**
-  - [src/components/auth/RegisterForm.tsx](src/components/auth/RegisterForm.tsx) — after a 201 from register it currently calls `signIn("credentials", …)` then pushes `/dashboard` (lines 66–82). Replace the auto-sign-in with a redirect to the new "check your email" page.
-  - [src/app/api/auth/register/route.ts](src/app/api/auth/register/route.ts) — after `prisma.user.create` (currently sets no `emailVerified`), generate + persist a verification token and send the Resend email.
-  - [src/auth.ts](src/auth.ts) `authorize` (lines 26–40) — add an `emailVerified` gate so unverified credentials users can't sign in.
-- **New surface (to design during `start`):** an email-sending lib (e.g. `src/lib/email.ts`), a token helper (`src/lib/tokens.ts`), a `/verify-email` route/handler that validates the token + marks the user verified, and a `/check-email` (or similar) page.
-- **Scope:** applies to the **credentials** flow. GitHub OAuth accounts are already verified by the provider — don't force them through email verification.
-- Keep the existing register API response contract stable where possible; the form change is minimal (swap post-register navigation).
-- Custom types / build order: this extends the auth phases (phase 4-ish). Prior auth work is in History below.
+<!-- Additional context, constraints, or details from spec -->
 
 ## History
 
@@ -46,3 +32,4 @@ In Progress
 **Auth Setup — NextAuth v5 + GitHub Provider** (2026-07-10) - Phase 1 of auth: NextAuth v5 (`next-auth@^5.0.0-beta.31`) + `@auth/prisma-adapter` using the split, edge-safe config pattern. New `src/auth.config.ts` (adapter-free, GitHub provider only) and `src/auth.ts` (Prisma adapter over the existing `@/lib/prisma` singleton, `session.strategy: "jwt"`, `jwt`/`session` callbacks that carry `user.id`), re-exported through the route handler `src/app/api/auth/[...nextauth]/route.ts`. Route protection via the Next.js 16 proxy `src/proxy.ts` — a second adapter-free `NextAuth(authConfig)` instance, named `export const proxy = auth(...)`, `matcher: ["/dashboard/:path*"]`, redirecting unauthenticated dashboard hits to NextAuth's default sign-in page with a `callbackUrl`. Extended `Session.user.id` + `JWT.id` in `src/types/next-auth.d.ts`. No custom auth UI yet (default pages). Verified: production build passes with `/api/auth/[...nextauth]` and the proxy registered; `GET /dashboard` → 302 → `/api/auth/signin?callbackUrl=%2Fdashboard`, `/api/auth/providers` lists GitHub, sign-in page 200, home stays public. GitHub OAuth round-trip left for manual browser check. Phase-2 (credentials/email-password) and phase-3 (custom sign-in/register/sign-out UI) specs staged under `context/features/` for later.
 **Auth Credentials — Email/Password Provider** (2026-07-10) - Phase 2 of auth: a Credentials provider alongside GitHub, via the split edge-safe pattern. `auth.config.ts` gains a Credentials **placeholder** (`authorize: () => null`) so the edge proxy sees the provider without bcrypt/Prisma; `auth.ts` layers the real `authorize` (Node) — Zod-validates, looks up the user, rejects unknown/OAuth-only accounts (no `passwordHash`), and `bcrypt.compare`s the hash. New `src/lib/validations/auth.ts` holds shared Zod schemas (`credentialsSchema`, `registerSchema` with confirm-match) and an `emailSchema` normalized (trim/lowercase) on both write and lookup. New `POST /api/auth/register`: Zod-validated (400), rejects duplicates (409, incl. Prisma `P2002` race → 409, other errors → 500), hashes at 12 rounds (matches seed), creates the user with a `select` that omits `passwordHash`. Promoted `zod` to a direct dependency. No migration — `passwordHash` already on `User`. Verified live: providers lists credentials + github; register returns 201/409/400; full CSRF sign-in yields a session with `user.id`, wrong password yields none. Lint + `tsc` + build pass. No custom auth UI yet — deferred to phase 3.
 **Auth UI — Sign In, Register & Sign Out** (2026-07-10) - Phase 3 of auth: custom UI replacing NextAuth's default pages, plus the real session user in the sidebar. `pages.signIn: "/sign-in"` on the shared config; proxy redirects to `/sign-in` and also protects `/profile`. New `(auth)` route group: `/sign-in` (credentials + GitHub, `redirect:false` error handling, inline GitHub SVG) and `/register` (validated form → `/api/auth/register`, then **auto-sign-in** to `/dashboard`). Reusable `UserAvatar` (GitHub image via `next/image` else initials) + `getInitials`; allowed `avatars.githubusercontent.com`. Sidebar footer uses the real user (fetched in `dashboard/layout.tsx` via `auth()` + Prisma `isPro`, passed as `user`/`SidebarUser`); the user card is a dropdown trigger with **Profile** and a destructive **Sign out** behind an `AlertDialog` confirmation. Added minimal `/profile` page and shadcn `dropdown-menu`/`alert-dialog`; removed now-unused `mock-data.ts`. `tsc` + lint clean, production build passes. GitHub OAuth + email/password sign-in left for manual browser check.
+**Email Verification on Register (Resend)** (2026-07-11) - Phase 4 of auth: register no longer auto-signs in — it issues a 24h single-use token (new `src/lib/tokens.ts`, reusing the `VerificationToken` model) and emails a Resend link (new `src/lib/email.ts`), then redirects to `/check-email`. The link hits `GET /api/auth/verify-email`, which consumes the token, sets `emailVerified`, and shows a `/verify-email` result page; `POST /api/auth/resend-verification` + a check-email button re-send. Credentials `authorize` now blocks unverified accounts via an `EmailNotVerifiedError` (`code: "email_not_verified"`) that `SignInForm` shows as a resend prompt (GitHub OAuth skips the gate). Verified end-to-end; build passes. **Known limits:** Resend is in testing mode (no domain), so `onboarding@resend.dev` only delivers to the account owner at 1/day; send failures are logged but return a generic 200. Also added `scripts/delete-non-demo-users.ts` (`npm run db:prune-users`), gitignored `.playwright-mcp/`, and set `DATABASE_URL` to `sslmode=verify-full` to silence the pg SSL warning.
