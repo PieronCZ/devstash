@@ -4,6 +4,7 @@
 
 import type { ContentType } from "@/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
+import { SYSTEM_TYPE_ORDER } from "@/lib/item-types";
 
 // Placeholder identity — the seed creates this user. Replace with the
 // authenticated session user once NextAuth is in place.
@@ -128,18 +129,6 @@ export interface SidebarItemType {
   color: string; // hex
   count: number; // items of this type owned by the current (demo) user
 }
-
-// Stable display order for the built-in system types; anything unknown is
-// appended after these in name order.
-const SYSTEM_TYPE_ORDER = [
-  "snippet",
-  "prompt",
-  "command",
-  "note",
-  "link",
-  "file",
-  "image",
-];
 
 // System item types with the current (demo) user's per-type item counts, for
 // the sidebar's Types list. Ordered to match the product's canonical listing.

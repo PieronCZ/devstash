@@ -17,6 +17,7 @@ import {
 import { currentUser } from "@/lib/mock-data";
 import type { SidebarItemType } from "@/lib/db/items";
 import type { SidebarCollection } from "@/lib/db/collections";
+import { PRO_TYPES } from "@/lib/item-types";
 import { getTypeIcon } from "@/lib/icons";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
@@ -41,9 +42,6 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
-
-// Item types gated behind a Pro plan — flagged with a PRO badge in the sidebar.
-const PRO_TYPES = new Set(["file", "image"]);
 
 // Primary navigation shown above the type list.
 const mainNav = [
