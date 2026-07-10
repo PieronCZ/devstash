@@ -10,6 +10,10 @@ import type { NextAuthConfig } from "next-auth";
 // knows it exists, but its real bcrypt/DB-backed `authorize` lives in auth.ts
 // (Node runtime) — bcryptjs and Prisma can't run on the edge.
 export default {
+  // Custom auth UI (phase 3) — replaces NextAuth's default sign-in page.
+  pages: {
+    signIn: "/sign-in",
+  },
   providers: [
     GitHub,
     Credentials({

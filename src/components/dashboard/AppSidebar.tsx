@@ -3,18 +3,21 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { signOut } from "next-auth/react";
 import {
   Boxes,
   ChevronRight,
+  ChevronsUpDown,
   Circle,
   Clock,
+  LoaderCircle,
+  LogOut,
   Plus,
-  Settings,
   Sparkles,
   Star,
+  User,
 } from "lucide-react";
 
-import { currentUser } from "@/lib/mock-data";
 import type { SidebarItemType } from "@/lib/db/items";
 import type { SidebarCollection } from "@/lib/db/collections";
 import { PRO_TYPES } from "@/lib/item-types";
@@ -22,11 +25,29 @@ import { getTypeIcon } from "@/lib/icons";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { UserAvatar } from "@/components/ui/user-avatar";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Sidebar,
   SidebarContent,
@@ -37,7 +58,6 @@ import {
   SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
-  SidebarMenuAction,
   SidebarMenuBadge,
   SidebarMenuButton,
   SidebarMenuItem,
@@ -50,13 +70,11 @@ const mainNav = [
   { title: "Recent", href: "/recent", icon: Clock },
 ];
 
-function initials(name: string): string {
-  return name
-    .split(" ")
-    .map((part) => part[0])
-    .slice(0, 2)
-    .join("")
-    .toUpperCase();
+export interface SidebarUser {
+  name: string | null;
+  email: string | null;
+  image: string | null;
+  isPro: boolean;
 }
 
 interface AppSidebarProps {
@@ -65,11 +83,14 @@ interface AppSidebarProps {
     favorites: SidebarCollection[];
     recent: SidebarCollection[];
   };
+  user: SidebarUser;
 }
 
-export function AppSidebar({ itemTypes, collections }: AppSidebarProps) {
+export function AppSidebar({ itemTypes, collections, user }: AppSidebarProps) {
   const pathname = usePathname();
   const [collectionsOpen, setCollectionsOpen] = useState(true);
+  const [signOutOpen, setSignOutOpen] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
 
   const isActive = (href: string) =>
     href === "/dashboard" ? pathname === href : pathname.startsWith(href);
@@ -242,7 +263,7 @@ export function AppSidebar({ itemTypes, collections }: AppSidebarProps) {
       </SidebarContent>
 
       <SidebarFooter>
-        {!currentUser.isPro ? (
+        {!user.isPro ? (
           <div className="rounded-lg border border-sidebar-border bg-sidebar-accent/50 p-3 group-data-[collapsible=icon]:hidden">
             <div className="flex items-center gap-2 text-sm font-medium text-sidebar-accent-foreground">
               <Sparkles className="size-4 text-primary" />
@@ -264,30 +285,75 @@ export function AppSidebar({ itemTypes, collections }: AppSidebarProps) {
 
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton
-              size="lg"
-              tooltip={currentUser.name}
-              render={<Link href="/account" />}
-            >
-              <span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-sidebar-primary text-xs font-semibold text-sidebar-primary-foreground">
-                {initials(currentUser.name)}
-              </span>
-              <span className="flex min-w-0 flex-col text-left leading-tight">
-                <span className="truncate text-sm font-medium text-sidebar-accent-foreground">
-                  {currentUser.name}
+            {/* The whole user card is the account-menu trigger. */}
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                render={<SidebarMenuButton size="lg" className="cursor-pointer" />}
+              >
+                <UserAvatar
+                  name={user.name}
+                  image={user.image}
+                  className="size-7 text-[10px]"
+                />
+                <span className="flex min-w-0 flex-col text-left leading-tight">
+                  <span className="truncate text-sm font-medium text-sidebar-accent-foreground">
+                    {user.name ?? "Your account"}
+                  </span>
+                  <span className="truncate text-xs text-sidebar-foreground/60">
+                    {user.email}
+                  </span>
                 </span>
-                <span className="truncate text-xs text-sidebar-foreground/60">
-                  {currentUser.email}
-                </span>
-              </span>
-            </SidebarMenuButton>
-            <SidebarMenuAction
-              title="Settings"
-              render={<Link href="/settings" />}
-            >
-              <Settings />
-              <span className="sr-only">Settings</span>
-            </SidebarMenuAction>
+                <ChevronsUpDown className="ml-auto size-4 text-sidebar-foreground/60" />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent side="top" align="end" className="w-56">
+                <DropdownMenuItem
+                  className="cursor-pointer"
+                  render={<Link href="/profile" />}
+                >
+                  <User />
+                  Profile
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  variant="destructive"
+                  className="cursor-pointer"
+                  onClick={() => setSignOutOpen(true)}
+                >
+                  <LogOut />
+                  Sign out
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            <AlertDialog open={signOutOpen} onOpenChange={setSignOutOpen}>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Sign out?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    You&apos;ll need to sign in again to get back to your stash.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel className="cursor-pointer" disabled={signingOut}>
+                    Cancel
+                  </AlertDialogCancel>
+                  <AlertDialogAction
+                    variant="destructive"
+                    className="cursor-pointer"
+                    disabled={signingOut}
+                    onClick={(e) => {
+                      // Keep the dialog open (with a spinner) through the redirect.
+                      e.preventDefault();
+                      setSigningOut(true);
+                      signOut({ callbackUrl: "/sign-in" });
+                    }}
+                  >
+                    {signingOut ? <LoaderCircle className="animate-spin" /> : null}
+                    Sign out
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarFooter>

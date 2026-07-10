@@ -7,17 +7,19 @@ const { auth } = NextAuth(authConfig);
 
 export const proxy = auth((req) => {
   const isLoggedIn = !!req.auth;
-  const isProtected = req.nextUrl.pathname.startsWith("/dashboard");
+  const { pathname } = req.nextUrl;
+  const isProtected =
+    pathname.startsWith("/dashboard") || pathname.startsWith("/profile");
 
   if (isProtected && !isLoggedIn) {
-    // Redirect to NextAuth's default sign-in page, preserving where the user
-    // was headed so they land back there after authenticating.
-    const signInUrl = new URL("/api/auth/signin", req.nextUrl.origin);
+    // Redirect to the custom sign-in page, preserving where the user was
+    // headed so they land back there after authenticating.
+    const signInUrl = new URL("/sign-in", req.nextUrl.origin);
     signInUrl.searchParams.set("callbackUrl", req.nextUrl.pathname);
     return Response.redirect(signInUrl);
   }
 });
 
 export const config = {
-  matcher: ["/dashboard/:path*"],
+  matcher: ["/dashboard/:path*", "/profile/:path*"],
 };
