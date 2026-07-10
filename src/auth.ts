@@ -1,14 +1,45 @@
 import NextAuth from "next-auth";
+import GitHub from "next-auth/providers/github";
+import Credentials from "next-auth/providers/credentials";
+import bcrypt from "bcryptjs";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import { prisma } from "@/lib/prisma";
 import authConfig from "@/auth.config";
+import { credentialsSchema } from "@/lib/validations/auth";
 
 // Full config used throughout the app (server components, route handlers,
 // server actions). Adds the Prisma adapter and the JWT session strategy on top
-// of the edge-safe providers from auth.config.ts.
+// of the edge-safe providers from auth.config.ts, and swaps the placeholder
+// Credentials provider for one with real bcrypt/DB-backed validation (this
+// module runs on the Node runtime, so bcryptjs and Prisma are available).
 export const { handlers, auth, signIn, signOut } = NextAuth({
+  ...authConfig,
   adapter: PrismaAdapter(prisma),
   session: { strategy: "jwt" },
+  providers: [
+    GitHub,
+    Credentials({
+      credentials: {
+        email: { label: "Email", type: "email" },
+        password: { label: "Password", type: "password" },
+      },
+      async authorize(credentials) {
+        const parsed = credentialsSchema.safeParse(credentials);
+        if (!parsed.success) return null;
+
+        const { email, password } = parsed.data;
+        const user = await prisma.user.findUnique({ where: { email } });
+
+        // Reject unknown users and OAuth-only accounts (no password set).
+        if (!user?.passwordHash) return null;
+
+        const passwordMatches = await bcrypt.compare(password, user.passwordHash);
+        if (!passwordMatches) return null;
+
+        return { id: user.id, name: user.name, email: user.email, image: user.image };
+      },
+    }),
+  ],
   callbacks: {
     // Persist the user id on the token at sign-in.
     jwt({ token, user }) {
@@ -21,5 +52,4 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       return session;
     },
   },
-  ...authConfig,
 });
