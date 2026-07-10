@@ -7,9 +7,6 @@ import { CollectionCard } from "@/components/dashboard/CollectionCard";
 import { ItemCard } from "@/components/dashboard/ItemCard";
 import { StatCard } from "@/components/dashboard/StatCard";
 
-// Collections are read live from the database on each request.
-export const dynamic = "force-dynamic";
-
 function SectionHeader({
   icon: Icon,
   children,

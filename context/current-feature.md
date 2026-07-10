@@ -1,18 +1,35 @@
 # Current Feature
 
-<!-- Feature name and short description -->
+**Scan Quick Wins** — Low/no-risk cleanups surfaced by the `code-scanner` subagent. Skips the higher-effort structural items (`AppSidebar` split, `getRecentCollections` rework) for a dedicated follow-up.
 
 ## Status
 
-<!-- Not Started | In Progress | Completed -->
+In Progress
 
 ## Goals
 
-<!-- Goals and requirements -->
+1. **Composite indexes for common filter+sort patterns** (DB change — Prisma conventions only)
+   - Add `@@index([userId, isPinned, updatedAt])` on `Item` and `@@index([userId, updatedAt])` on `Collection` in `prisma/schema.prisma`.
+   - Additive, index-only change — no data/column changes, safe to apply.
+   - **Must** go through a Prisma migration (`npm run db:migrate` → `prisma migrate dev`), never `db push` or raw SQL, so dev and production branches stay in sync. Deploy to prod with `npm run db:deploy` (`prisma migrate deploy`).
+
+2. **Consolidate duplicated type metadata into a single source of truth**
+   - Create `src/lib/item-types.ts` exporting the canonical system-type order and the Pro-gated type set.
+   - Replace `SYSTEM_TYPE_ORDER` in `src/lib/db/items.ts` and `PRO_TYPES` in `src/components/dashboard/AppSidebar.tsx` with imports from it.
+   - Pure refactor, no behavior change.
+
+3. **Remove redundant `force-dynamic`**
+   - Drop `export const dynamic = "force-dynamic"` in `src/app/dashboard/page.tsx` — the layout's `cookies()` call already makes the route dynamic, so it's a no-op.
+
+4. **Add Next.js `loading` + `error` UI for the dashboard**
+   - `src/app/dashboard/loading.tsx` — skeleton mirroring the page layout (header, 4 stats, collections grid, recent items grid) shown while the server component awaits its DB reads.
+   - `src/app/dashboard/error.tsx` — route-level error boundary (`"use client"`) with a `reset()` retry button for failed DB reads/renders.
 
 ## Notes
 
-<!-- Any extra notes -->
+- All three are low-risk; verify with `npm run build` (stop `npm run dev` first) and a quick `npm run lint`.
+- After the migration, run `npx prisma migrate status` to confirm dev is in sync before committing.
+- Deferred (not part of this feature): splitting `AppSidebar` into subcomponents, and bounding/`groupBy`-ing `getRecentCollections`.
 
 ## History
 
