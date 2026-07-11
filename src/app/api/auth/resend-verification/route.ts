@@ -5,14 +5,25 @@ import { prisma } from "@/lib/prisma";
 import { emailSchema } from "@/lib/validations/auth";
 import { createVerificationToken } from "@/lib/tokens";
 import { sendVerificationEmail } from "@/lib/email";
+import { isEmailVerificationEnabled } from "@/lib/auth-flags";
 
 const bodySchema = z.object({ email: emailSchema });
+
+// Shared generic response — never reveals account state.
+const genericOk = () =>
+  NextResponse.json(
+    { message: "If that account needs verification, a new link is on its way." },
+    { status: 200 },
+  );
 
 // POST /api/auth/resend-verification { email }
 // Re-issues a verification link for an unverified credentials account. Always
 // responds 200 with a generic message so it never reveals whether an email is
 // registered or already verified.
 export async function POST(request: Request) {
+  // No-op when verification is disabled — nothing to (re)send.
+  if (!isEmailVerificationEnabled()) return genericOk();
+
   let body: unknown;
   try {
     body = await request.json();
@@ -41,8 +52,5 @@ export async function POST(request: Request) {
     }
   }
 
-  return NextResponse.json(
-    { message: "If that account needs verification, a new link is on its way." },
-    { status: 200 },
-  );
+  return genericOk();
 }

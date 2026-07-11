@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { signIn } from "next-auth/react";
 import { LoaderCircle } from "lucide-react";
 
 import { registerSchema } from "@/lib/validations/auth";
@@ -55,14 +56,35 @@ export function RegisterForm() {
         body: JSON.stringify(parsed.data),
       });
 
+      const data = await res.json().catch(() => null);
+
       if (!res.ok) {
-        const data = await res.json().catch(() => null);
         setFormError(data?.error ?? "Registration failed. Please try again.");
         setPending(false);
         return;
       }
 
-      // Account created — the user must verify their email before signing in.
+      // Verification disabled server-side — sign the user straight in.
+      if (data?.verificationRequired === false) {
+        const signInResult = await signIn("credentials", {
+          email: parsed.data.email,
+          password: parsed.data.password,
+          redirect: false,
+        });
+
+        if (signInResult?.error) {
+          // Account exists but auto sign-in failed — fall back to the sign-in
+          // page rather than leaving them stuck.
+          router.push("/sign-in?registered=1");
+          return;
+        }
+
+        router.push("/dashboard");
+        router.refresh();
+        return;
+      }
+
+      // Verification required — the user must confirm their email first.
       // Send them to the "check your email" page instead of auto sign-in.
       router.push(`/check-email?email=${encodeURIComponent(parsed.data.email)}`);
     } catch {
