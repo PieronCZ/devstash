@@ -1,16 +1,24 @@
-# Current Feature
+# Current Feature: Profile Page
 
 ## Status
 
-Not Started
+In Progress
 
 ## Goals
 
-<!-- Bullet points of what success looks like -->
+- Build a protected `/profile` page (requires authentication)
+- Display user info: email, name, avatar (GitHub or initials), account creation date
+- Show usage stats: total items, total collections, and a per-item-type breakdown (snippets, prompts, notes, commands, links, files, images)
+- Add account actions: change password (email/password users only) and delete account with a confirmation dialog
+- Follow existing codebase patterns for data fetching (server components + Prisma) and components (shadcn/ui)
 
 ## Notes
 
-<!-- Additional context, constraints, or details from spec -->
+- Avatar: reuse GitHub OAuth image when available, else initials from name/email (existing `UserAvatar`/`getInitials`)
+- Change password button appears only for credentials accounts (has `passwordHash`), not GitHub OAuth-only users
+- Delete account must be behind a confirmation dialog (reuse `AlertDialog` pattern) to prevent accidental deletion
+- Item type breakdown shows a count per system type
+- A minimal `/profile` page already exists (from Auth Phase 3) — this feature builds it out
 
 ## History
 

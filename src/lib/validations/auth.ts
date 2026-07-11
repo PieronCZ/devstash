@@ -44,3 +44,22 @@ export const resetPasswordSchema = z
   });
 
 export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;
+
+// Change-password payload (signed-in user): current password plus the new one
+// (confirmed). The new password must differ from the current one.
+export const changePasswordSchema = z
+  .object({
+    currentPassword: z.string().min(1, "Current password is required"),
+    password: passwordSchema,
+    confirmPassword: z.string(),
+  })
+  .refine((data) => data.password === data.confirmPassword, {
+    message: "Passwords do not match",
+    path: ["confirmPassword"],
+  })
+  .refine((data) => data.password !== data.currentPassword, {
+    message: "New password must be different from the current one",
+    path: ["password"],
+  });
+
+export type ChangePasswordInput = z.infer<typeof changePasswordSchema>;
