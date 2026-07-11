@@ -1,24 +1,16 @@
-# Current Feature: Profile Page
+# Current Feature
 
 ## Status
 
-In Progress
+Not Started
 
 ## Goals
 
-- Build a protected `/profile` page (requires authentication)
-- Display user info: email, name, avatar (GitHub or initials), account creation date
-- Show usage stats: total items, total collections, and a per-item-type breakdown (snippets, prompts, notes, commands, links, files, images)
-- Add account actions: change password (email/password users only) and delete account with a confirmation dialog
-- Follow existing codebase patterns for data fetching (server components + Prisma) and components (shadcn/ui)
+<!-- Bullet points of what success looks like -->
 
 ## Notes
 
-- Avatar: reuse GitHub OAuth image when available, else initials from name/email (existing `UserAvatar`/`getInitials`)
-- Change password button appears only for credentials accounts (has `passwordHash`), not GitHub OAuth-only users
-- Delete account must be behind a confirmation dialog (reuse `AlertDialog` pattern) to prevent accidental deletion
-- Item type breakdown shows a count per system type
-- A minimal `/profile` page already exists (from Auth Phase 3) — this feature builds it out
+<!-- Additional context, constraints, or details from spec -->
 
 ## History
 
@@ -43,3 +35,4 @@ In Progress
 **Email Verification on Register (Resend)** (2026-07-11) - Phase 4 of auth: register no longer auto-signs in — it issues a 24h single-use token (new `src/lib/tokens.ts`, reusing the `VerificationToken` model) and emails a Resend link (new `src/lib/email.ts`), then redirects to `/check-email`. The link hits `GET /api/auth/verify-email`, which consumes the token, sets `emailVerified`, and shows a `/verify-email` result page; `POST /api/auth/resend-verification` + a check-email button re-send. Credentials `authorize` now blocks unverified accounts via an `EmailNotVerifiedError` (`code: "email_not_verified"`) that `SignInForm` shows as a resend prompt (GitHub OAuth skips the gate). Verified end-to-end; build passes. **Known limits:** Resend is in testing mode (no domain), so `onboarding@resend.dev` only delivers to the account owner at 1/day; send failures are logged but return a generic 200. Also added `scripts/delete-non-demo-users.ts` (`npm run db:prune-users`), gitignored `.playwright-mcp/`, and set `DATABASE_URL` to `sslmode=verify-full` to silence the pg SSL warning.
 **Toggle Email Verification** (2026-07-11) - A single flag turns the whole verification system on/off. New `src/lib/auth-flags.ts#isEmailVerificationEnabled()` reads `EMAIL_VERIFICATION_ENABLED` (enabled by default; `false`/`0`/`off`/`no` disables) as the one source of truth. When OFF: the register route skips the token + Resend email, marks the account `emailVerified` at creation (so re-enabling later never strands users), and returns `verificationRequired:false`; `RegisterForm` then auto signs-in → `/dashboard` (else → `/check-email`); `authorize` skips the `emailVerified` gate; `resend-verification` is a no-op (generic 200). Documented in `.env.example`; no DB migration. Verified both states (OFF: register returns `verificationRequired:false` and an unverified user signs straight into the dashboard; ON: register routes to `/check-email`). `tsc`/lint/build pass.
 **Forgot Password** (2026-07-11) - Password-reset flow reusing the NextAuth `VerificationToken` table. A "Forgot password?" link on `/sign-in` → `/forgot-password` → `POST /api/auth/forgot-password` (always a generic 200, no account-existence leak; only emails a Resend reset link for a real credentials account). The link opens `/reset-password?token=…` → `POST /api/auth/reset-password`, which consumes the token and sets a new bcrypt hash (12 rounds), then routes to `/sign-in?reset=1` with a success notice. **Token reuse without clobber:** reset tokens are namespaced (`identifier: "reset:<email>"`); `src/lib/tokens.ts` refactors a shared `issueToken()` and each consumer guards on the namespace *before* deleting, so a token submitted to the wrong endpoint isn't burned (a valid email can't contain ":", so the prefix is an unambiguous discriminator). A successful reset also sets `emailVerified` (receiving the email proves ownership). Works regardless of `EMAIL_VERIFICATION_ENABLED`. New Zod schemas (`forgotPasswordSchema`/`resetPasswordSchema`), `sendPasswordResetEmail` template, two `(auth)` pages + forms (`ForgotPasswordForm`/`ResetPasswordForm`). No DB migration. `tsc`/lint/build pass. **Known limits (carried over):** Resend testing mode only delivers to the account owner; no rate limiting on the request endpoint (consistent with register/resend).
+**Profile Page** (2026-07-11) - Built out the minimal `/profile` stub (from Auth Phase 3) into the full page. Server component (`auth()` + Prisma, redirects unauthenticated) rendering three sections: **Identity** (avatar via `UserAvatar`, name, email, plan, sign-in method derived from OAuth `accounts`/`passwordHash`, member-since from `createdAt` via `Intl.DateTimeFormat`); **Usage** (item + collection totals and a per-system-type breakdown with type icon/color, from new `src/lib/db/profile.ts#getProfileStats(userId)` — parallel counts + `itemType` `_count` filtered by user, ordered by `SYSTEM_TYPE_ORDER`); and **Account actions**. Change password shows only for credentials accounts (`!!passwordHash`): `ChangePasswordCard` (client, inline toggle form reusing `changePasswordSchema`) → `POST /api/auth/change-password` (session-guarded, rejects OAuth-only accounts, `bcrypt.compare`s current password, re-hashes at 12 rounds). Delete account: `DeleteAccountCard` (client) with a **type-`DELETE`-to-confirm** `AlertDialog` gating the destructive button → `POST /api/account/delete` (session-guarded `deleteMany`, cascade removes items/collections/tags/accounts/sessions) then `signOut` → `/sign-in`. New `changePasswordSchema` (confirm-match + new≠current) in `validations/auth.ts`. No DB migration. `tsc`/lint/production build pass (both new routes registered, `/profile` dynamic). Browser verification was interrupted; not manually clicked through.
