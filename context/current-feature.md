@@ -1,30 +1,16 @@
-# Current Feature: Toggle Email Verification
+# Current Feature
 
 ## Status
 
-In Progress
+Not Started
 
 ## Goals
 
-- A single flag turns the whole email-verification system on/off without code changes.
-- **When OFF:** register creates a usable account immediately (no token, no email) and the user proceeds straight in (auto sign-in → `/dashboard`, restoring the pre-verification flow); unverified accounts can sign in normally.
-- **When ON:** current behavior is unchanged (token + Resend email → `/check-email`, sign-in gated on `emailVerified`).
-- Flipping the flag never locks out existing users.
-- Build passes; both states verified in the browser.
+<!-- Bullet points of what success looks like -->
 
 ## Notes
 
-- **Mechanism:** server-side env var (recommended) — e.g. `EMAIL_VERIFICATION_ENABLED`, read through one helper `src/lib/auth-flags.ts#isEmailVerificationEnabled()` so every consumer shares one source of truth. Env var wins over alternatives (DB-backed setting = overkill; `NEXT_PUBLIC_` = leaks to client unnecessarily). **Open decision for `start`:** default state (lean OFF for now, since Resend has no domain and can only mail its owner).
-- **Client can't read server env** → the register API returns a `verificationRequired: boolean` field and `RegisterForm` branches on it (true → `/check-email`, false → auto `signIn` → `/dashboard`). Avoids a `NEXT_PUBLIC_` duplicate.
-- **Don't lock users out on toggle:** when OFF, register should set `emailVerified` at creation (mark trusted) so turning the flag back ON later doesn't strand pre-existing accounts.
-- **Files to touch:**
-  - New `src/lib/auth-flags.ts` — the helper.
-  - [src/app/api/auth/register/route.ts](src/app/api/auth/register/route.ts) — when OFF: skip token+email, set `emailVerified`, return `verificationRequired:false`.
-  - [src/components/auth/RegisterForm.tsx](src/components/auth/RegisterForm.tsx) — branch on `verificationRequired`.
-  - [src/auth.ts](src/auth.ts) — skip the `EmailNotVerifiedError` gate when OFF.
-  - [src/app/api/auth/resend-verification/route.ts](src/app/api/auth/resend-verification/route.ts) — no-op when OFF (still generic 200).
-  - `.env` / `.env.example` — document the new var (both states).
-- Scope: credentials flow only (GitHub OAuth already bypasses verification). No DB migration.
+<!-- Additional context, constraints, or details from spec -->
 
 ## History
 
@@ -47,3 +33,4 @@ In Progress
 **Auth Credentials — Email/Password Provider** (2026-07-10) - Phase 2 of auth: a Credentials provider alongside GitHub, via the split edge-safe pattern. `auth.config.ts` gains a Credentials **placeholder** (`authorize: () => null`) so the edge proxy sees the provider without bcrypt/Prisma; `auth.ts` layers the real `authorize` (Node) — Zod-validates, looks up the user, rejects unknown/OAuth-only accounts (no `passwordHash`), and `bcrypt.compare`s the hash. New `src/lib/validations/auth.ts` holds shared Zod schemas (`credentialsSchema`, `registerSchema` with confirm-match) and an `emailSchema` normalized (trim/lowercase) on both write and lookup. New `POST /api/auth/register`: Zod-validated (400), rejects duplicates (409, incl. Prisma `P2002` race → 409, other errors → 500), hashes at 12 rounds (matches seed), creates the user with a `select` that omits `passwordHash`. Promoted `zod` to a direct dependency. No migration — `passwordHash` already on `User`. Verified live: providers lists credentials + github; register returns 201/409/400; full CSRF sign-in yields a session with `user.id`, wrong password yields none. Lint + `tsc` + build pass. No custom auth UI yet — deferred to phase 3.
 **Auth UI — Sign In, Register & Sign Out** (2026-07-10) - Phase 3 of auth: custom UI replacing NextAuth's default pages, plus the real session user in the sidebar. `pages.signIn: "/sign-in"` on the shared config; proxy redirects to `/sign-in` and also protects `/profile`. New `(auth)` route group: `/sign-in` (credentials + GitHub, `redirect:false` error handling, inline GitHub SVG) and `/register` (validated form → `/api/auth/register`, then **auto-sign-in** to `/dashboard`). Reusable `UserAvatar` (GitHub image via `next/image` else initials) + `getInitials`; allowed `avatars.githubusercontent.com`. Sidebar footer uses the real user (fetched in `dashboard/layout.tsx` via `auth()` + Prisma `isPro`, passed as `user`/`SidebarUser`); the user card is a dropdown trigger with **Profile** and a destructive **Sign out** behind an `AlertDialog` confirmation. Added minimal `/profile` page and shadcn `dropdown-menu`/`alert-dialog`; removed now-unused `mock-data.ts`. `tsc` + lint clean, production build passes. GitHub OAuth + email/password sign-in left for manual browser check.
 **Email Verification on Register (Resend)** (2026-07-11) - Phase 4 of auth: register no longer auto-signs in — it issues a 24h single-use token (new `src/lib/tokens.ts`, reusing the `VerificationToken` model) and emails a Resend link (new `src/lib/email.ts`), then redirects to `/check-email`. The link hits `GET /api/auth/verify-email`, which consumes the token, sets `emailVerified`, and shows a `/verify-email` result page; `POST /api/auth/resend-verification` + a check-email button re-send. Credentials `authorize` now blocks unverified accounts via an `EmailNotVerifiedError` (`code: "email_not_verified"`) that `SignInForm` shows as a resend prompt (GitHub OAuth skips the gate). Verified end-to-end; build passes. **Known limits:** Resend is in testing mode (no domain), so `onboarding@resend.dev` only delivers to the account owner at 1/day; send failures are logged but return a generic 200. Also added `scripts/delete-non-demo-users.ts` (`npm run db:prune-users`), gitignored `.playwright-mcp/`, and set `DATABASE_URL` to `sslmode=verify-full` to silence the pg SSL warning.
+**Toggle Email Verification** (2026-07-11) - A single flag turns the whole verification system on/off. New `src/lib/auth-flags.ts#isEmailVerificationEnabled()` reads `EMAIL_VERIFICATION_ENABLED` (enabled by default; `false`/`0`/`off`/`no` disables) as the one source of truth. When OFF: the register route skips the token + Resend email, marks the account `emailVerified` at creation (so re-enabling later never strands users), and returns `verificationRequired:false`; `RegisterForm` then auto signs-in → `/dashboard` (else → `/check-email`); `authorize` skips the `emailVerified` gate; `resend-verification` is a no-op (generic 200). Documented in `.env.example`; no DB migration. Verified both states (OFF: register returns `verificationRequired:false` and an unverified user signs straight into the dashboard; ON: register routes to `/check-email`). `tsc`/lint/build pass.
