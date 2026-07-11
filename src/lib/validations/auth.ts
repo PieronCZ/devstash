@@ -25,3 +25,22 @@ export const registerSchema = z
   });
 
 export type RegisterInput = z.infer<typeof registerSchema>;
+
+// Forgot-password request — email only.
+export const forgotPasswordSchema = z.object({
+  email: emailSchema,
+});
+
+// Reset-password payload: the emailed token plus the new password (confirmed).
+export const resetPasswordSchema = z
+  .object({
+    token: z.string().min(1, "Token is required"),
+    password: passwordSchema,
+    confirmPassword: z.string(),
+  })
+  .refine((data) => data.password === data.confirmPassword, {
+    message: "Passwords do not match",
+    path: ["confirmPassword"],
+  });
+
+export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;
