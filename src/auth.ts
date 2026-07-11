@@ -6,6 +6,7 @@ import { PrismaAdapter } from "@auth/prisma-adapter";
 import { prisma } from "@/lib/prisma";
 import authConfig from "@/auth.config";
 import { credentialsSchema } from "@/lib/validations/auth";
+import { isEmailVerificationEnabled } from "@/lib/auth-flags";
 
 // Thrown when the password is correct but the account's email isn't verified.
 // The `code` is surfaced to the client so the sign-in form can prompt the user
@@ -45,7 +46,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
         // Block sign-in until the email is verified (credentials accounts only;
         // GitHub OAuth accounts are provider-verified and never hit this path).
-        if (!user.emailVerified) throw new EmailNotVerifiedError();
+        // Skipped entirely when email verification is disabled.
+        if (isEmailVerificationEnabled() && !user.emailVerified) {
+          throw new EmailNotVerifiedError();
+        }
 
         return { id: user.id, name: user.name, email: user.email, image: user.image };
       },

@@ -1,16 +1,30 @@
-# Current Feature
+# Current Feature: Toggle Email Verification
 
 ## Status
 
-Not Started
+In Progress
 
 ## Goals
 
-<!-- Bullet points of what success looks like -->
+- A single flag turns the whole email-verification system on/off without code changes.
+- **When OFF:** register creates a usable account immediately (no token, no email) and the user proceeds straight in (auto sign-in → `/dashboard`, restoring the pre-verification flow); unverified accounts can sign in normally.
+- **When ON:** current behavior is unchanged (token + Resend email → `/check-email`, sign-in gated on `emailVerified`).
+- Flipping the flag never locks out existing users.
+- Build passes; both states verified in the browser.
 
 ## Notes
 
-<!-- Additional context, constraints, or details from spec -->
+- **Mechanism:** server-side env var (recommended) — e.g. `EMAIL_VERIFICATION_ENABLED`, read through one helper `src/lib/auth-flags.ts#isEmailVerificationEnabled()` so every consumer shares one source of truth. Env var wins over alternatives (DB-backed setting = overkill; `NEXT_PUBLIC_` = leaks to client unnecessarily). **Open decision for `start`:** default state (lean OFF for now, since Resend has no domain and can only mail its owner).
+- **Client can't read server env** → the register API returns a `verificationRequired: boolean` field and `RegisterForm` branches on it (true → `/check-email`, false → auto `signIn` → `/dashboard`). Avoids a `NEXT_PUBLIC_` duplicate.
+- **Don't lock users out on toggle:** when OFF, register should set `emailVerified` at creation (mark trusted) so turning the flag back ON later doesn't strand pre-existing accounts.
+- **Files to touch:**
+  - New `src/lib/auth-flags.ts` — the helper.
+  - [src/app/api/auth/register/route.ts](src/app/api/auth/register/route.ts) — when OFF: skip token+email, set `emailVerified`, return `verificationRequired:false`.
+  - [src/components/auth/RegisterForm.tsx](src/components/auth/RegisterForm.tsx) — branch on `verificationRequired`.
+  - [src/auth.ts](src/auth.ts) — skip the `EmailNotVerifiedError` gate when OFF.
+  - [src/app/api/auth/resend-verification/route.ts](src/app/api/auth/resend-verification/route.ts) — no-op when OFF (still generic 200).
+  - `.env` / `.env.example` — document the new var (both states).
+- Scope: credentials flow only (GitHub OAuth already bypasses verification). No DB migration.
 
 ## History
 
