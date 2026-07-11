@@ -10,13 +10,17 @@ export const metadata = {
 export default async function SignInPage({
   searchParams,
 }: {
-  searchParams: Promise<{ callbackUrl?: string; registered?: string }>;
+  searchParams: Promise<{
+    callbackUrl?: string;
+    registered?: string;
+    reset?: string;
+  }>;
 }) {
   // Already authenticated — skip the form.
   const session = await auth();
   if (session?.user) redirect("/dashboard");
 
-  const { callbackUrl, registered } = await searchParams;
+  const { callbackUrl, registered, reset } = await searchParams;
 
   return (
     <div className="flex flex-col gap-6">
@@ -29,6 +33,11 @@ export default async function SignInPage({
       {registered ? (
         <p className="rounded-lg border border-border bg-muted/50 px-3 py-2 text-center text-sm text-muted-foreground">
           Account created — sign in to continue.
+        </p>
+      ) : null}
+      {reset ? (
+        <p className="rounded-lg border border-border bg-muted/50 px-3 py-2 text-center text-sm text-muted-foreground">
+          Password updated — sign in with your new password.
         </p>
       ) : null}
       <SignInForm callbackUrl={callbackUrl ?? "/dashboard"} />
