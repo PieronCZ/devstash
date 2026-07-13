@@ -39,11 +39,12 @@ export async function POST(request: Request) {
   const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
 
   // Set the new password and mark the email verified — receiving the reset
-  // email proves ownership. updateMany avoids a throw if the account was
-  // deleted between issuing and consuming the token.
+  // email proves ownership. `passwordChangedAt` invalidates any sessions issued
+  // before the reset (see the jwt callback in auth.ts). updateMany avoids a
+  // throw if the account was deleted between issuing and consuming the token.
   const result = await prisma.user.updateMany({
     where: { email },
-    data: { passwordHash, emailVerified: new Date() },
+    data: { passwordHash, passwordChangedAt: new Date(), emailVerified: new Date() },
   });
 
   if (result.count === 0) {

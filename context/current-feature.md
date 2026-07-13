@@ -1,16 +1,38 @@
-# Current Feature
+# Current Feature: Auth Audit Fixes — H1, M3, L3
 
 ## Status
 
-Not Started
+In Progress
 
 ## Goals
 
-<!-- Bullet points of what success looks like -->
+Resolve three findings from `context/audits/auth-audit-2026-07-11.md`:
+
+- **H1 — Stop deriving emailed links from the request `Host` header (link/token poisoning).**
+  - Introduce a fixed, server-only canonical origin (`APP_URL` env var, falling back to `http://localhost:3000`) as the single source of truth for absolute links.
+  - Use it instead of `new URL(request.url).origin` in every route that builds an emailed link or a link-derived redirect:
+    - `src/app/api/auth/register/route.ts` (verification link)
+    - `src/app/api/auth/forgot-password/route.ts` (reset link)
+    - `src/app/api/auth/resend-verification/route.ts` (verification link)
+    - `src/app/api/auth/verify-email/route.ts` (redirect target)
+  - Document `APP_URL` in `.env.example`.
+
+- **M3 — Invalidate existing sessions after a password change or reset.**
+  - Add a `passwordChangedAt DateTime?` column to `User` via a Prisma migration (dev branch only; migration-only, no `db push`).
+  - Set it in `reset-password` and `change-password` whenever the hash changes (and at register-time so new accounts have a baseline).
+  - Embed the value in the JWT at sign-in and compare it against the current DB row in the `jwt` callback; reject/invalidate a token whose `passwordChangedAt` is older than the DB value so pre-change sessions stop working.
+
+- **L3 — Make email verification a POST, not a state-changing GET.**
+  - Split the flow like reset-password: `GET /api/auth/verify-email` (or the `/verify-email` page) renders a confirm screen; a `POST` actually consumes the token and sets `emailVerified`.
+  - This prevents link-scanning mail proxies (Outlook Safe Links, antivirus prefetch) from silently burning the token before the user clicks.
 
 ## Notes
 
-<!-- Additional context, constraints, or details from spec -->
+- Source of findings: `context/audits/auth-audit-2026-07-11.md` (H1 = High, M3 = Medium, L3 = Low). M1, M2, L1, L2 are explicitly **out of scope** for this task.
+- **DB rules (CLAUDE.md):** any schema change is migration-only via `prisma migrate dev` on the Neon **development** branch (`br-frosty-fire-asb0z4k7`) — never `db push`, never touch production.
+- **M3 decision:** use the `passwordChangedAt` + JWT-comparison approach rather than switching to `session.strategy: "database"`, to stay surgical against the existing JWT setup (`src/auth.ts` callbacks). Confirm the JWT callback re-reads the DB row (cheap indexed lookup by id) so invalidation takes effect promptly.
+- **L3 pattern to mirror:** `reset-password` already separates the GET page (`src/app/(auth)/reset-password/page.tsx` renders a form) from the token-consuming `POST /api/auth/reset-password`. Apply the same GET-renders / POST-consumes split to verification, reusing `consumeVerificationToken` on the POST side. The verification email link (`src/lib/email.ts`) currently points at the API GET route — repoint it at the confirm page.
+- Verify `npm run build` passes before committing; per workflow, no commit until the build is green and the flows are checked.
 
 ## History
 

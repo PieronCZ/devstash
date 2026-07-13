@@ -18,18 +18,22 @@ datasource db {
 enum ContentType {
   TEXT // payload in `content`
   FILE // payload in `fileUrl` / `fileName` / `fileSize`
-  URL  // payload in `url` (link-type items)
+  URL // payload in `url` (link-type items)
 }
 
 // ───────────────────── App domain models ─────────────────
 
 model User {
-  id            String    @id @default(cuid())
-  name          String?
-  email         String    @unique
-  emailVerified DateTime?
-  image         String?
-  passwordHash  String? // bcrypt hash for credentials auth; null for OAuth-only users
+  id                String    @id @default(cuid())
+  name              String?
+  email             String    @unique
+  emailVerified     DateTime?
+  image             String?
+  passwordHash      String? // bcrypt hash for credentials auth; null for OAuth-only users
+  // Bumped on every password change/reset. Embedded in the JWT at sign-in and
+  // compared in the jwt callback so sessions issued before the change stop
+  // working (session invalidation on password change/reset).
+  passwordChangedAt DateTime?
 
   // DevStash / billing
   isPro                Boolean @default(false)

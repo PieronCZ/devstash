@@ -6,6 +6,7 @@ import { emailSchema } from "@/lib/validations/auth";
 import { createVerificationToken } from "@/lib/tokens";
 import { sendVerificationEmail } from "@/lib/email";
 import { isEmailVerificationEnabled } from "@/lib/auth-flags";
+import { getAppUrl } from "@/lib/app-url";
 
 const bodySchema = z.object({ email: emailSchema });
 
@@ -46,7 +47,7 @@ export async function POST(request: Request) {
   if (user?.passwordHash && !user.emailVerified) {
     try {
       const token = await createVerificationToken(email);
-      await sendVerificationEmail(email, token, new URL(request.url).origin);
+      await sendVerificationEmail(email, token, getAppUrl());
     } catch (err) {
       console.error("Failed to resend verification email:", err);
     }

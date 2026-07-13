@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { forgotPasswordSchema } from "@/lib/validations/auth";
 import { createPasswordResetToken } from "@/lib/tokens";
 import { sendPasswordResetEmail } from "@/lib/email";
+import { getAppUrl } from "@/lib/app-url";
 
 // Shared generic response — never reveals whether an account exists.
 const genericOk = () =>
@@ -39,7 +40,7 @@ export async function POST(request: Request) {
   if (user?.passwordHash) {
     try {
       const token = await createPasswordResetToken(email);
-      await sendPasswordResetEmail(email, token, new URL(request.url).origin);
+      await sendPasswordResetEmail(email, token, getAppUrl());
     } catch (err) {
       console.error("Failed to send password reset email:", err);
     }

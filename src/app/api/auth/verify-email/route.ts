@@ -1,16 +1,31 @@
 import { NextResponse } from "next/server";
+import { z } from "zod";
 
 import { consumeVerificationToken } from "@/lib/tokens";
 
-// GET /api/auth/verify-email?token=... — the target of the emailed link.
-// Validates and consumes the token, then redirects to the /verify-email page
-// with the outcome so the mutation stays out of React render.
-export async function GET(request: Request) {
-  const token = new URL(request.url).searchParams.get("token");
+const bodySchema = z.object({ token: z.string().min(1) });
 
-  const status = token ? await consumeVerificationToken(token) : "invalid";
+// POST /api/auth/verify-email { token }
+// Consumes the verification token and sets the user's `emailVerified`. This is a
+// POST (not a state-changing GET) so link-scanning mail proxies that prefetch
+// the emailed link can't silently burn the token — the /verify-email page
+// renders a confirm button that submits here on a real user click.
+export async function POST(request: Request) {
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ status: "invalid" }, { status: 400 });
+  }
 
-  return NextResponse.redirect(
-    new URL(`/verify-email?status=${status}`, request.url),
-  );
+  const parsed = bodySchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json({ status: "invalid" }, { status: 400 });
+  }
+
+  const status = await consumeVerificationToken(parsed.data.token);
+
+  // Always 200 — the outcome is carried in the body so the client can render
+  // the right message (success / expired / invalid).
+  return NextResponse.json({ status }, { status: 200 });
 }

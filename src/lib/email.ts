@@ -8,16 +8,19 @@ const resend = new Resend(process.env.RESEND_API_KEY);
 const FROM = "DevStash <onboarding@resend.dev>";
 
 /**
- * Send the account email-verification message. `origin` is the request origin
- * (e.g. https://devstash.app) so the link is absolute and environment-correct
- * without depending on a separate base-URL env var.
+ * Send the account email-verification message. `origin` is the canonical app
+ * origin (e.g. https://devstash.app) from `getAppUrl()` — a fixed env var, never
+ * the request `Host` header — so the emailed link can't be host-header-poisoned.
  */
 export async function sendVerificationEmail(
   to: string,
   token: string,
   origin: string,
 ): Promise<void> {
-  const verifyUrl = `${origin}/api/auth/verify-email?token=${token}`;
+  // Point at the verification *page* (not the API route) so link-scanning mail
+  // proxies that prefetch the URL don't consume the token — the page only
+  // renders a confirm button; a POST from that button actually verifies.
+  const verifyUrl = `${origin}/verify-email?token=${token}`;
 
   const { error } = await resend.emails.send({
     from: FROM,
@@ -33,9 +36,10 @@ export async function sendVerificationEmail(
 }
 
 /**
- * Send the password-reset message. `origin` is the request origin so the link
- * is absolute and environment-correct. The link targets the reset *page*
- * (not an API route) where the user enters a new password.
+ * Send the password-reset message. `origin` is the canonical app origin from
+ * `getAppUrl()` (a fixed env var, never the request `Host` header) so the link
+ * can't be host-header-poisoned. It targets the reset *page* (not an API route)
+ * where the user enters a new password.
  */
 export async function sendPasswordResetEmail(
   to: string,
