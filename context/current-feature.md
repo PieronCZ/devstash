@@ -1,38 +1,16 @@
-# Current Feature: Auth Audit Fixes — H1, M3, L3
+# Current Feature
 
 ## Status
 
-In Progress
+Not Started
 
 ## Goals
 
-Resolve three findings from `context/audits/auth-audit-2026-07-11.md`:
-
-- **H1 — Stop deriving emailed links from the request `Host` header (link/token poisoning).**
-  - Introduce a fixed, server-only canonical origin (`APP_URL` env var, falling back to `http://localhost:3000`) as the single source of truth for absolute links.
-  - Use it instead of `new URL(request.url).origin` in every route that builds an emailed link or a link-derived redirect:
-    - `src/app/api/auth/register/route.ts` (verification link)
-    - `src/app/api/auth/forgot-password/route.ts` (reset link)
-    - `src/app/api/auth/resend-verification/route.ts` (verification link)
-    - `src/app/api/auth/verify-email/route.ts` (redirect target)
-  - Document `APP_URL` in `.env.example`.
-
-- **M3 — Invalidate existing sessions after a password change or reset.**
-  - Add a `passwordChangedAt DateTime?` column to `User` via a Prisma migration (dev branch only; migration-only, no `db push`).
-  - Set it in `reset-password` and `change-password` whenever the hash changes (and at register-time so new accounts have a baseline).
-  - Embed the value in the JWT at sign-in and compare it against the current DB row in the `jwt` callback; reject/invalidate a token whose `passwordChangedAt` is older than the DB value so pre-change sessions stop working.
-
-- **L3 — Make email verification a POST, not a state-changing GET.**
-  - Split the flow like reset-password: `GET /api/auth/verify-email` (or the `/verify-email` page) renders a confirm screen; a `POST` actually consumes the token and sets `emailVerified`.
-  - This prevents link-scanning mail proxies (Outlook Safe Links, antivirus prefetch) from silently burning the token before the user clicks.
+<!-- Bullet points of what success looks like -->
 
 ## Notes
 
-- Source of findings: `context/audits/auth-audit-2026-07-11.md` (H1 = High, M3 = Medium, L3 = Low). M1, M2, L1, L2 are explicitly **out of scope** for this task.
-- **DB rules (CLAUDE.md):** any schema change is migration-only via `prisma migrate dev` on the Neon **development** branch (`br-frosty-fire-asb0z4k7`) — never `db push`, never touch production.
-- **M3 decision:** use the `passwordChangedAt` + JWT-comparison approach rather than switching to `session.strategy: "database"`, to stay surgical against the existing JWT setup (`src/auth.ts` callbacks). Confirm the JWT callback re-reads the DB row (cheap indexed lookup by id) so invalidation takes effect promptly.
-- **L3 pattern to mirror:** `reset-password` already separates the GET page (`src/app/(auth)/reset-password/page.tsx` renders a form) from the token-consuming `POST /api/auth/reset-password`. Apply the same GET-renders / POST-consumes split to verification, reusing `consumeVerificationToken` on the POST side. The verification email link (`src/lib/email.ts`) currently points at the API GET route — repoint it at the confirm page.
-- Verify `npm run build` passes before committing; per workflow, no commit until the build is green and the flows are checked.
+<!-- Additional context, constraints, or details from spec -->
 
 ## History
 
@@ -58,3 +36,4 @@ Resolve three findings from `context/audits/auth-audit-2026-07-11.md`:
 **Toggle Email Verification** (2026-07-11) - A single flag turns the whole verification system on/off. New `src/lib/auth-flags.ts#isEmailVerificationEnabled()` reads `EMAIL_VERIFICATION_ENABLED` (enabled by default; `false`/`0`/`off`/`no` disables) as the one source of truth. When OFF: the register route skips the token + Resend email, marks the account `emailVerified` at creation (so re-enabling later never strands users), and returns `verificationRequired:false`; `RegisterForm` then auto signs-in → `/dashboard` (else → `/check-email`); `authorize` skips the `emailVerified` gate; `resend-verification` is a no-op (generic 200). Documented in `.env.example`; no DB migration. Verified both states (OFF: register returns `verificationRequired:false` and an unverified user signs straight into the dashboard; ON: register routes to `/check-email`). `tsc`/lint/build pass.
 **Forgot Password** (2026-07-11) - Password-reset flow reusing the NextAuth `VerificationToken` table. A "Forgot password?" link on `/sign-in` → `/forgot-password` → `POST /api/auth/forgot-password` (always a generic 200, no account-existence leak; only emails a Resend reset link for a real credentials account). The link opens `/reset-password?token=…` → `POST /api/auth/reset-password`, which consumes the token and sets a new bcrypt hash (12 rounds), then routes to `/sign-in?reset=1` with a success notice. **Token reuse without clobber:** reset tokens are namespaced (`identifier: "reset:<email>"`); `src/lib/tokens.ts` refactors a shared `issueToken()` and each consumer guards on the namespace *before* deleting, so a token submitted to the wrong endpoint isn't burned (a valid email can't contain ":", so the prefix is an unambiguous discriminator). A successful reset also sets `emailVerified` (receiving the email proves ownership). Works regardless of `EMAIL_VERIFICATION_ENABLED`. New Zod schemas (`forgotPasswordSchema`/`resetPasswordSchema`), `sendPasswordResetEmail` template, two `(auth)` pages + forms (`ForgotPasswordForm`/`ResetPasswordForm`). No DB migration. `tsc`/lint/build pass. **Known limits (carried over):** Resend testing mode only delivers to the account owner; no rate limiting on the request endpoint (consistent with register/resend).
 **Profile Page** (2026-07-11) - Built out the minimal `/profile` stub (from Auth Phase 3) into the full page. Server component (`auth()` + Prisma, redirects unauthenticated) rendering three sections: **Identity** (avatar via `UserAvatar`, name, email, plan, sign-in method derived from OAuth `accounts`/`passwordHash`, member-since from `createdAt` via `Intl.DateTimeFormat`); **Usage** (item + collection totals and a per-system-type breakdown with type icon/color, from new `src/lib/db/profile.ts#getProfileStats(userId)` — parallel counts + `itemType` `_count` filtered by user, ordered by `SYSTEM_TYPE_ORDER`); and **Account actions**. Change password shows only for credentials accounts (`!!passwordHash`): `ChangePasswordCard` (client, inline toggle form reusing `changePasswordSchema`) → `POST /api/auth/change-password` (session-guarded, rejects OAuth-only accounts, `bcrypt.compare`s current password, re-hashes at 12 rounds). Delete account: `DeleteAccountCard` (client) with a **type-`DELETE`-to-confirm** `AlertDialog` gating the destructive button → `POST /api/account/delete` (session-guarded `deleteMany`, cascade removes items/collections/tags/accounts/sessions) then `signOut` → `/sign-in`. New `changePasswordSchema` (confirm-match + new≠current) in `validations/auth.ts`. No DB migration. `tsc`/lint/production build pass (both new routes registered, `/profile` dynamic). Browser verification was interrupted; not manually clicked through.
+**Auth Audit Fixes — H1, M3, L3** (2026-07-13) - Resolved three findings from `context/audits/auth-audit-2026-07-11.md` (also lands the audit report + the `auth-auditor` agent). **H1 (link/token poisoning):** new `src/lib/app-url.ts#getAppUrl()` returns a fixed `APP_URL` origin (falls back to `http://localhost:3000`); `register`/`forgot-password`/`resend-verification` now build emailed links from it instead of `new URL(request.url).origin` (Host-header-derived), and `email.ts` docstrings updated to match. Documented `APP_URL` in `.env.example`. **M3 (session invalidation):** added `User.passwordChangedAt DateTime?` (migration `add_user_password_changed_at`; recreated the migration.sql that a prior aborted attempt had left applied-but-fileless in the dev DB, checksum-matched so no reset/data loss). Bumped it at register (baseline) + change-password + reset-password; the `jwt` callback in `src/auth.ts` snapshots it at sign-in and, on every later request, re-reads the DB row and returns `null` (clears the session cookie) when the token's snapshot predates the DB value — so pre-change sessions (and deleted accounts) are rejected. Kept the JWT strategy (surgical) rather than switching to DB sessions; per user decision, `ChangePasswordCard` now `signOut`s → `/sign-in?reset=1` on success (the current session is intentionally invalidated too). Extended the JWT type in `next-auth.d.ts`; the augmentation doesn't merge in this project (known next-auth v5 quirk) so the callback uses the existing `as`-cast pattern. **L3 (state-changing GET):** `/api/auth/verify-email` is now a token-consuming **POST**; the emailed link points at the `/verify-email?token=` **page** (safe for mail-scanner prefetch — GET only renders) which shows a confirm button (`VerifyEmailForm`) that POSTs to actually consume the token. Verified live via Playwright: L3 (GET left the token in the DB, POST consumed it once) and M3 (bumping `passwordChangedAt` invalidated an active session → redirect to sign-in; fresh sign-in works). `tsc`/lint/production build pass. **Out of scope:** M1, M2, L1 (rate limiting), L2. **Not runtime-verified:** H1 (needs a real Resend send).
