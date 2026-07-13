@@ -7,6 +7,7 @@ import { createVerificationToken } from "@/lib/tokens";
 import { sendVerificationEmail } from "@/lib/email";
 import { isEmailVerificationEnabled } from "@/lib/auth-flags";
 import { getAppUrl } from "@/lib/app-url";
+import { checkRateLimit, getClientIp, limiters, rateLimitResponse } from "@/lib/rate-limit";
 
 const bodySchema = z.object({ email: emailSchema });
 
@@ -38,6 +39,11 @@ export async function POST(request: Request) {
   }
 
   const { email } = parsed.data;
+
+  // Rate limit by IP + email (3 / 15 min) — caps re-send spam per target inbox.
+  const rl = await checkRateLimit(limiters.resendVerification, `${getClientIp(request)}:${email}`);
+  if (!rl.success) return rateLimitResponse(rl.reset);
+
   const user = await prisma.user.findUnique({
     where: { email },
     select: { passwordHash: true, emailVerified: true },

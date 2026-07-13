@@ -4,6 +4,7 @@ import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { resetPasswordSchema } from "@/lib/validations/auth";
 import { consumePasswordResetToken } from "@/lib/tokens";
+import { checkRateLimit, getClientIp, limiters, rateLimitResponse } from "@/lib/rate-limit";
 
 // Matches the seed/register cost factor so hashes are consistent across sources.
 const BCRYPT_ROUNDS = 12;
@@ -11,6 +12,10 @@ const BCRYPT_ROUNDS = 12;
 // POST /api/auth/reset-password { token, password, confirmPassword }
 // Consumes the reset token and sets a new password hash.
 export async function POST(request: Request) {
+  // Rate limit by IP (5 / 15 min) — throttles brute-forcing reset tokens.
+  const rl = await checkRateLimit(limiters.resetPassword, getClientIp(request));
+  if (!rl.success) return rateLimitResponse(rl.reset);
+
   let body: unknown;
   try {
     body = await request.json();

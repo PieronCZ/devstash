@@ -7,6 +7,7 @@ import { signIn } from "next-auth/react";
 import { LoaderCircle } from "lucide-react";
 
 import { credentialsSchema } from "@/lib/validations/auth";
+import { formatRetryAfter } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
@@ -55,6 +56,15 @@ export function SignInForm({ callbackUrl }: SignInFormProps) {
       // rather than the generic invalid-credentials message.
       if (result.code === "email_not_verified") {
         setUnverified(true);
+      } else if (result.code?.startsWith("rate_limited")) {
+        // The exact seconds-to-wait is embedded as `rate_limited_<seconds>`
+        // (see RateLimitError in auth.ts).
+        const seconds = Number(result.code.split("_").pop());
+        setError(
+          Number.isFinite(seconds) && seconds > 0
+            ? `Too many attempts. Please try again in ${formatRetryAfter(seconds)}.`
+            : "Too many attempts. Please try again later.",
+        );
       } else {
         setError("Invalid email or password.");
       }

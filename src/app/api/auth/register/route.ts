@@ -7,11 +7,16 @@ import { createVerificationToken } from "@/lib/tokens";
 import { sendVerificationEmail } from "@/lib/email";
 import { isEmailVerificationEnabled } from "@/lib/auth-flags";
 import { getAppUrl } from "@/lib/app-url";
+import { checkRateLimit, getClientIp, limiters, rateLimitResponse } from "@/lib/rate-limit";
 
 // Matches the seed script's cost factor so hashes are consistent across sources.
 const BCRYPT_ROUNDS = 12;
 
 export async function POST(request: Request) {
+  // Rate limit by IP (3 / hour) — throttles automated account creation.
+  const rl = await checkRateLimit(limiters.register, getClientIp(request));
+  if (!rl.success) return rateLimitResponse(rl.reset);
+
   let body: unknown;
   try {
     body = await request.json();
