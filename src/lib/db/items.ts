@@ -14,16 +14,13 @@ export interface DashboardItemType {
   color: string; // hex
 }
 
-// Shape the ItemCard renders.
+// Shape the ItemCard renders. Deliberately light — no `content` (which can be
+// very long); the full body is fetched on click via `getItemDetail`.
 export interface DashboardItem {
   id: string;
   title: string;
+  description: string | null;
   contentType: ContentType;
-  content: string | null; // TEXT items
-  url: string | null; // URL items
-  fileName: string | null; // FILE items
-  fileSize: number | null; // bytes, FILE items
-  language: string | null;
   tags: string[];
   isFavorite: boolean;
   isPinned: boolean;
@@ -31,16 +28,12 @@ export interface DashboardItem {
   type: DashboardItemType;
 }
 
-// What we need to select from an Item to build a DashboardItem.
+// What we need to select from an Item to build a DashboardItem (card).
 const itemSelect = {
   id: true,
   title: true,
+  description: true,
   contentType: true,
-  content: true,
-  url: true,
-  fileName: true,
-  fileSize: true,
-  language: true,
   isFavorite: true,
   isPinned: true,
   updatedAt: true,
@@ -51,12 +44,8 @@ const itemSelect = {
 type ItemRow = {
   id: string;
   title: string;
+  description: string | null;
   contentType: ContentType;
-  content: string | null;
-  url: string | null;
-  fileName: string | null;
-  fileSize: number | null;
-  language: string | null;
   isFavorite: boolean;
   isPinned: boolean;
   updatedAt: Date;
@@ -68,6 +57,76 @@ function toDashboardItem(item: ItemRow): DashboardItem {
   return {
     id: item.id,
     title: item.title,
+    description: item.description,
+    contentType: item.contentType,
+    tags: item.tags.map((t) => t.name),
+    isFavorite: item.isFavorite,
+    isPinned: item.isPinned,
+    updatedAt: item.updatedAt.toISOString(),
+    type: item.itemType,
+  };
+}
+
+// Full item detail rendered inside the drawer — fetched on click, not with the
+// card. Carries the heavy/less-common fields (content, url, file meta, language,
+// collections, created date) on top of what the card already shows.
+export interface ItemDetail {
+  id: string;
+  title: string;
+  description: string | null;
+  contentType: ContentType;
+  content: string | null; // TEXT items
+  url: string | null; // URL items
+  fileName: string | null; // FILE items
+  fileSize: number | null; // bytes, FILE items
+  language: string | null;
+  tags: string[];
+  collections: string[]; // collection names this item belongs to
+  isFavorite: boolean;
+  isPinned: boolean;
+  createdAt: string; // ISO
+  updatedAt: string; // ISO
+  type: DashboardItemType;
+}
+
+const itemDetailSelect = {
+  id: true,
+  title: true,
+  description: true,
+  contentType: true,
+  content: true,
+  url: true,
+  fileName: true,
+  fileSize: true,
+  language: true,
+  isFavorite: true,
+  isPinned: true,
+  createdAt: true,
+  updatedAt: true,
+  itemType: { select: { id: true, name: true, icon: true, color: true } },
+  tags: { select: { name: true }, orderBy: { name: "asc" } },
+  collections: {
+    select: { collection: { select: { name: true } } },
+    orderBy: { addedAt: "asc" },
+  },
+} as const;
+
+// Full detail for one item, scoped to its owner. Returns null when the item
+// doesn't exist or isn't owned by `userId` (caller 404s).
+export async function getItemDetail(
+  userId: string,
+  id: string,
+): Promise<ItemDetail | null> {
+  const item = await prisma.item.findFirst({
+    where: { id, userId },
+    select: itemDetailSelect,
+  });
+  if (!item) return null;
+
+  return {
+    id: item.id,
+    title: item.title,
+    description: item.description,
     contentType: item.contentType,
     content: item.content,
     url: item.url,
@@ -75,8 +134,10 @@ function toDashboardItem(item: ItemRow): DashboardItem {
     fileSize: item.fileSize,
     language: item.language,
     tags: item.tags.map((t) => t.name),
+    collections: item.collections.map((c) => c.collection.name),
     isFavorite: item.isFavorite,
     isPinned: item.isPinned,
+    createdAt: item.createdAt.toISOString(),
     updatedAt: item.updatedAt.toISOString(),
     type: item.itemType,
   };

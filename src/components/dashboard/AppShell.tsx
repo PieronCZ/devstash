@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { getSidebarCollections } from "@/lib/db/collections";
 import { getSidebarItemTypes } from "@/lib/db/items";
 import { AppSidebar, type SidebarUser } from "@/components/dashboard/AppSidebar";
+import { ItemDrawerProvider } from "@/components/dashboard/ItemDrawerProvider";
 import { TopBar } from "@/components/dashboard/TopBar";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -51,7 +52,9 @@ export async function AppShell({
         <AppSidebar itemTypes={itemTypes} collections={collections} user={user} />
         <SidebarInset>
           <TopBar />
-          <main className="flex-1 p-6">{children}</main>
+          <main className="flex-1 p-6">
+            <ItemDrawerProvider>{children}</ItemDrawerProvider>
+          </main>
         </SidebarInset>
       </SidebarProvider>
     </TooltipProvider>
