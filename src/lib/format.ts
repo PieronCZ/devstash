@@ -34,3 +34,20 @@ export function formatFileSize(bytes: number): string {
   if (kb < 1024) return `${Math.round(kb)} KB`;
   return `${(kb / 1024).toFixed(1)} MB`;
 }
+
+// Precise "how long to wait" from a seconds count, for rate-limit messages.
+// e.g. 45 -> "45 seconds", 60 -> "1 minute", 92 -> "1 minute 32 seconds".
+// Shared by the API 429 responses and the sign-in form (client), so it must
+// stay free of any server-only imports.
+export function formatRetryAfter(seconds: number): string {
+  const total = Math.max(1, Math.ceil(seconds));
+  const plural = (n: number, unit: string) => `${n} ${unit}${n === 1 ? "" : "s"}`;
+
+  if (total < 60) return plural(total, "second");
+
+  const minutes = Math.floor(total / 60);
+  const secs = total % 60;
+  return secs === 0
+    ? plural(minutes, "minute")
+    : `${plural(minutes, "minute")} ${plural(secs, "second")}`;
+}

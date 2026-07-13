@@ -5,6 +5,7 @@ import { forgotPasswordSchema } from "@/lib/validations/auth";
 import { createPasswordResetToken } from "@/lib/tokens";
 import { sendPasswordResetEmail } from "@/lib/email";
 import { getAppUrl } from "@/lib/app-url";
+import { checkRateLimit, getClientIp, limiters, rateLimitResponse } from "@/lib/rate-limit";
 
 // Shared generic response — never reveals whether an account exists.
 const genericOk = () =>
@@ -17,6 +18,11 @@ const genericOk = () =>
 // Issues a reset token + emails the link for a real credentials account. Always
 // responds 200 with a generic message (no account-existence leak).
 export async function POST(request: Request) {
+  // Rate limit by IP (3 / hour) — caps reset-email abuse. Keep the 429 ahead of
+  // the generic 200 so a flood is visibly throttled (not silently swallowed).
+  const rl = await checkRateLimit(limiters.forgotPassword, getClientIp(request));
+  if (!rl.success) return rateLimitResponse(rl.reset);
+
   let body: unknown;
   try {
     body = await request.json();

@@ -2,17 +2,32 @@ import NextAuth, { CredentialsSignin } from "next-auth";
 import GitHub from "next-auth/providers/github";
 import Credentials from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
+import { headers } from "next/headers";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import { prisma } from "@/lib/prisma";
 import authConfig from "@/auth.config";
 import { credentialsSchema } from "@/lib/validations/auth";
 import { isEmailVerificationEnabled } from "@/lib/auth-flags";
+import { checkRateLimit, ipFromHeaders, limiters, retryAfterSeconds } from "@/lib/rate-limit";
 
 // Thrown when the password is correct but the account's email isn't verified.
 // The `code` is surfaced to the client so the sign-in form can prompt the user
 // to check their inbox / resend the link (rather than a generic error).
 class EmailNotVerifiedError extends CredentialsSignin {
   code = "email_not_verified";
+}
+
+// Thrown when the IP+email has exceeded the login attempt limit. NextAuth can't
+// return a 429 from the credentials callback, so the limit surfaces via the
+// error `code`, which the sign-in form reads. The exact seconds-to-wait is
+// embedded in the code (`rate_limited_<seconds>`) so the form can show the same
+// precise "try again in X" message the JSON API routes return.
+class RateLimitError extends CredentialsSignin {
+  code: string;
+  constructor(seconds: number) {
+    super();
+    this.code = `rate_limited_${seconds}`;
+  }
 }
 
 // Full config used throughout the app (server components, route handlers,
@@ -36,6 +51,14 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         if (!parsed.success) return null;
 
         const { email, password } = parsed.data;
+
+        // Rate limit by IP + email (5 / 15 min) before touching the DB or
+        // running bcrypt — throttles brute force / credential stuffing. Fails
+        // open if Upstash is unavailable (see checkRateLimit).
+        const ip = ipFromHeaders(await headers());
+        const rl = await checkRateLimit(limiters.login, `${ip}:${email}`);
+        if (!rl.success) throw new RateLimitError(retryAfterSeconds(rl.reset));
+
         const user = await prisma.user.findUnique({ where: { email } });
 
         // Reject unknown users and OAuth-only accounts (no password set).
