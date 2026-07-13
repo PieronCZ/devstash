@@ -2,20 +2,15 @@
 
 ## Status
 
-In Progress
+Not Started
 
 ## Goals
 
-- Set up Vitest for unit testing, scoped to **server actions and utilities only** (no component/UI tests).
-- Node test environment (no jsdom), `@/` path alias, `npm test` / `test:watch` / `test:coverage` scripts.
-- Seed real starter tests for the pure utilities so the harness is proven end-to-end.
-- Update the workflow docs so unit testing is part of the standard feature cycle.
+<!-- Bullet points of what success looks like -->
 
 ## Notes
 
-- Only test pure/business logic: `src/lib/**` utilities and (future) `src/actions/**` server actions. Deliberately **not** testing React components.
-- Tests co-located next to source as `*.test.ts`. Vitest globals off — import `describe/it/expect` from `vitest`.
-- `src/actions` does not exist yet; first server-action tests will land with the Items CRUD work.
+<!-- Additional context, constraints, or details from spec -->
 
 ## History
 
@@ -47,3 +42,4 @@ In Progress
 **Research Docs — Item Types & CRUD Architecture** (2026-07-13) - Added a `/research` skill (`.claude/skills/research/`) that runs a prompt from `context/research/` and writes documentation only. Produced `docs/item-types.md` (reference for the 7 system types: name/icon/color/purpose/key fields, the `ContentType` text-url-file classification, shared props, per-type display) and `docs/item-crud-architecture.md` (proposed unified CRUD: one `src/actions/items.ts` mutation surface, `lib/db` reads from server components, one `/items/[type]` route, type-specific logic in components). Committed to `main` (`76a484f`).
 **Fix — Dashboard scoped to session user** (2026-07-13) - The dashboard's data reads were still hardcoded to the seeded demo account (`DEMO_EMAIL = "demo@devstash.io"`), a leftover from before auth landed — so every newly registered user saw the demo user's 18 items, 5 collections, and favorites instead of their own empty stash. Removed the constant from `src/lib/db/items.ts` and `src/lib/db/collections.ts` and changed all six read functions (`getPinnedItems`, `getRecentItems`, `getItemStats`, `getSidebarItemTypes`, `getRecentCollections`, `getSidebarCollections`) to take a `userId` and filter with `where: { userId }` (dropping the `user: { email }` relation filter). `dashboard/page.tsx` now resolves the session via `auth()` and passes `session.user.id` (redirects to `/sign-in` if absent); `dashboard/layout.tsx` awaits `auth()` first, then runs the two sidebar reads + the `isPro`/name/image user lookup in one `Promise.all` scoped to that id. The demo account keeps its seeded data as before. Verified via Playwright: a fresh sign-in as `mateuszbrzoska@seznam.cz` shows 0 items · 0 collections and all sidebar counts at 0. `tsc`/lint/production build pass. No DB migration.
 **Items List View** (2026-07-13) - New type-filtered listing at `/items/[type]` (where the sidebar Types links already pointed — previously 404). Server component: resolves the session, 404s unknown types, renders a header + responsive `ItemCard` grid (`md:grid-cols-2`, reused unchanged) + empty state. Added `resolveSystemTypeName` (tolerates plural form, e.g. `/items/snippets`), `getSystemItemType`, and `getItemsByType(userId, name)` (scoped to `userId` + `isSystem`, pinned-first) in `lib/db/items.ts`. Extracted the dashboard chrome into `AppShell` so `/items` shares the sidebar/top bar (dashboard/layout + items/layout are thin wrappers). Added a `loading.tsx` skeleton for instant type-switch feedback and `/items/:path*` to the proxy matcher. Verified in-browser; lint + build pass. No DB migration.
+**Vitest Setup — Unit Testing** (2026-07-13) - Added Vitest (Node env, no jsdom) scoped to business logic only — utilities (`src/lib/**`) + future server actions (`src/actions/**`); no component tests. `vitest.config.ts` (`@/` alias, globals off), `test`/`test:watch`/`test:coverage` scripts, and 50 starter tests for `format`, `auth-flags`, `app-url`, `item-types`, and the auth Zod schemas. Testing policy documented in `CLAUDE.md`, `coding-standards.md`, and the feature workflow (+ new `test` skill action). `npm test` + build pass.
