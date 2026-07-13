@@ -4,6 +4,9 @@ import { revalidatePath } from "next/cache";
 
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import type { ItemDetail } from "@/lib/db/items";
+import { updateItem as updateItemQuery } from "@/lib/db/items";
+import { updateItemSchema } from "@/lib/validations/items";
 
 // Result shape shared by the item mutations — mirrors the project's
 // { success, data, error } convention (data folded in on success).
@@ -68,6 +71,32 @@ export async function togglePin(
 
   revalidateItemViews();
   return { success: true, isPinned: next };
+}
+
+// Update an item's editable fields. Validates the payload with Zod (source of
+// truth), then delegates the owner-scoped write to the query layer. Returns the
+// refreshed detail so the drawer can update without a second fetch; the first
+// Zod issue is surfaced as `error` for inline display.
+export async function updateItem(
+  id: string,
+  input: unknown,
+): Promise<ActionResult<{ item: ItemDetail }>> {
+  const userId = await requireUserId();
+  if (!userId) return { success: false, error: "Not authenticated" };
+
+  const parsed = updateItemSchema.safeParse(input);
+  if (!parsed.success) {
+    return {
+      success: false,
+      error: parsed.error.issues[0]?.message ?? "Validation failed",
+    };
+  }
+
+  const item = await updateItemQuery(userId, id, parsed.data);
+  if (!item) return { success: false, error: "Item not found" };
+
+  revalidateItemViews();
+  return { success: true, item };
 }
 
 // Permanently delete an item. `deleteMany` scopes the write to the owner and

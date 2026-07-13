@@ -1,6 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { deleteItem, toggleFavorite, togglePin } from "@/actions/items";
+import {
+  deleteItem,
+  toggleFavorite,
+  togglePin,
+  updateItem,
+} from "@/actions/items";
 
 // Mock the external boundaries: auth + Prisma + Next's cache helper.
 const auth = vi.fn();
@@ -17,6 +22,12 @@ vi.mock("@/lib/prisma", () => ({
       deleteMany: (...args: unknown[]) => deleteMany(...args),
     },
   },
+}));
+
+// The update action delegates the owner-scoped write to the query layer.
+const updateItemQuery = vi.fn();
+vi.mock("@/lib/db/items", () => ({
+  updateItem: (...args: unknown[]) => updateItemQuery(...args),
 }));
 
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
@@ -114,5 +125,55 @@ describe("deleteItem", () => {
     expect(deleteMany).toHaveBeenCalledWith({
       where: { id: "item-1", userId: "user-1" },
     });
+  });
+});
+
+describe("updateItem", () => {
+  const validInput = { title: "New title", tags: ["a", "b"] };
+
+  it("rejects when not authenticated", async () => {
+    auth.mockResolvedValue(null);
+    const res = await updateItem("item-1", validInput);
+    expect(res).toEqual({ success: false, error: "Not authenticated" });
+    expect(updateItemQuery).not.toHaveBeenCalled();
+  });
+
+  it("returns the first Zod issue when validation fails", async () => {
+    const res = await updateItem("item-1", { title: "  ", tags: [] });
+    expect(res).toEqual({ success: false, error: "Title is required" });
+    expect(updateItemQuery).not.toHaveBeenCalled();
+  });
+
+  it("returns not found when the query reports no owned item", async () => {
+    updateItemQuery.mockResolvedValue(null);
+    const res = await updateItem("item-1", validInput);
+    expect(res).toEqual({ success: false, error: "Item not found" });
+  });
+
+  it("passes the validated (normalized) data to the query and returns the item", async () => {
+    const detail = { id: "item-1", title: "New title" };
+    updateItemQuery.mockResolvedValue(detail);
+
+    const res = await updateItem("item-1", {
+      title: "New title",
+      tags: ["a", " a ", "", "b"],
+    });
+
+    expect(res).toEqual({ success: true, item: detail });
+    expect(updateItemQuery).toHaveBeenCalledWith("user-1", "item-1", {
+      title: "New title",
+      // tags normalized by the schema: trimmed, de-duplicated, empties dropped.
+      tags: ["a", "b"],
+    });
+  });
+
+  it("rejects an invalid URL before touching the query", async () => {
+    const res = await updateItem("item-1", {
+      title: "T",
+      url: "not-a-url",
+      tags: [],
+    });
+    expect(res).toEqual({ success: false, error: "Must be a valid URL" });
+    expect(updateItemQuery).not.toHaveBeenCalled();
   });
 });
