@@ -1,12 +1,8 @@
 // Data fetching for the dashboard's collections section.
-// Reads directly from the database via Prisma. Scoped to the demo user until
-// auth is wired up (then swap DEMO_EMAIL for the session user's id).
+// Reads directly from the database via Prisma. Scoped to the authenticated
+// user, whose id each function receives from the caller.
 
 import { prisma } from "@/lib/prisma";
-
-// Placeholder identity — the seed creates this user. Replace with the
-// authenticated session user once NextAuth is in place.
-const DEMO_EMAIL = "demo@devstash.io";
 
 // A distinct item type present in a collection, for the little icon chips.
 export interface CollectionType {
@@ -27,12 +23,14 @@ export interface DashboardCollection {
   types: CollectionType[]; // distinct types, most-used first
 }
 
-// Recent collections for the current (demo) user, newest first, with the
-// data the card needs: item count, distinct types, and the accent color
-// derived from the most-used item type in each collection.
-export async function getRecentCollections(): Promise<DashboardCollection[]> {
+// Recent collections for the given user, newest first, with the data the
+// card needs: item count, distinct types, and the accent color derived from
+// the most-used item type in each collection.
+export async function getRecentCollections(
+  userId: string,
+): Promise<DashboardCollection[]> {
   const collections = await prisma.collection.findMany({
-    where: { user: { email: DEMO_EMAIL } },
+    where: { userId },
     orderBy: { updatedAt: "desc" },
     include: {
       defaultType: { select: { id: true, icon: true, color: true } },
@@ -97,12 +95,12 @@ export interface SidebarCollection {
 // Collections for the sidebar's Collections group: all favorites, plus the
 // four most recently updated. Each carries the accent color derived from its
 // most-used item type (falling back to the default type for empty collections).
-export async function getSidebarCollections(): Promise<{
+export async function getSidebarCollections(userId: string): Promise<{
   favorites: SidebarCollection[];
   recent: SidebarCollection[];
 }> {
   const collections = await prisma.collection.findMany({
-    where: { user: { email: DEMO_EMAIL } },
+    where: { userId },
     orderBy: { updatedAt: "desc" },
     include: {
       defaultType: { select: { color: true } },
