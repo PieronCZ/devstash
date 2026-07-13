@@ -1,6 +1,6 @@
 "use client";
 
-import { createElement, useState, useTransition } from "react";
+import { createElement, useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   CalendarDays,
@@ -16,6 +16,7 @@ import {
 
 import type { ItemDetail } from "@/lib/db/items";
 import { deleteItem, toggleFavorite, togglePin } from "@/actions/items";
+import { ItemDrawerEditForm } from "@/components/dashboard/ItemDrawerEditForm";
 import { getTypeIcon } from "@/lib/icons";
 import { formatFileSize, relativeTime } from "@/lib/format";
 import { Button } from "@/components/ui/button";
@@ -160,6 +161,34 @@ export function ItemDrawer({
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [copied, setCopied] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [flash, setFlash] = useState<string | null>(null);
+
+  // Leave edit mode (and clear any flash) whenever a different item is opened, so
+  // a reopened drawer always starts in view mode. Render-phase reset — React's
+  // recommended pattern for syncing state to a changing prop (the provider nulls
+  // `item` before each fetch, so reopening the same item resets too).
+  const itemId = item?.id ?? null;
+  const [prevItemId, setPrevItemId] = useState(itemId);
+  if (itemId !== prevItemId) {
+    setPrevItemId(itemId);
+    setIsEditing(false);
+    setFlash(null);
+  }
+
+  // Auto-dismiss the success flash.
+  useEffect(() => {
+    if (!flash) return;
+    const t = setTimeout(() => setFlash(null), 2500);
+    return () => clearTimeout(t);
+  }, [flash]);
+
+  function handleSaved(updated: ItemDetail) {
+    onItemUpdate(updated);
+    setIsEditing(false);
+    setFlash("Changes saved");
+    router.refresh();
+  }
 
   function handleFavorite() {
     if (!item) return;
@@ -244,7 +273,33 @@ export function ItemDrawer({
               </span>
             </SheetHeader>
 
+            {isEditing ? (
+              <>
+                <SheetTitle className="sr-only">
+                  Edit {item.title}
+                </SheetTitle>
+                <SheetDescription className="sr-only">
+                  Edit this item&apos;s fields.
+                </SheetDescription>
+                <ItemDrawerEditForm
+                  item={item}
+                  onCancel={() => setIsEditing(false)}
+                  onSaved={handleSaved}
+                />
+              </>
+            ) : (
             <div className="flex flex-col gap-5 px-4 pb-6">
+              {/* Success flash — shown briefly after a save. */}
+              {flash ? (
+                <p
+                  role="status"
+                  className="flex items-center gap-1.5 rounded-md border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-600 dark:text-emerald-400"
+                >
+                  <Check className="size-4" />
+                  {flash}
+                </p>
+              ) : null}
+
               {/* Title + description */}
               <div className="flex flex-col gap-1">
                 <SheetTitle className="text-lg leading-tight">
@@ -287,8 +342,12 @@ export function ItemDrawer({
                 </Button>
 
                 <div className="ml-auto flex items-center gap-1.5">
-                  {/* Editing lands with the type-specific editors, later. */}
-                  <Button variant="ghost" size="icon-sm" aria-label="Edit item">
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    aria-label="Edit item"
+                    onClick={() => setIsEditing(true)}
+                  >
                     <Pencil />
                   </Button>
                   <AlertDialog>
@@ -377,6 +436,7 @@ export function ItemDrawer({
                 </span>
               </div>
             </div>
+            )}
           </>
         )}
       </SheetContent>

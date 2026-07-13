@@ -2,9 +2,10 @@
 // item stats. Reads directly from the database via Prisma. Scoped to the
 // authenticated user, whose id each function receives from the caller.
 
-import type { ContentType } from "@/generated/prisma/client";
+import type { ContentType, Prisma } from "@/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
 import { SYSTEM_TYPE_ORDER } from "@/lib/item-types";
+import type { UpdateItemInput } from "@/lib/validations/items";
 
 // The item's type, resolved for the card's icon/border/label.
 export interface DashboardItemType {
@@ -141,6 +142,47 @@ export async function getItemDetail(
     updatedAt: item.updatedAt.toISOString(),
     type: item.itemType,
   };
+}
+
+// Update an item's editable fields, scoped to its owner. Returns the refreshed
+// ItemDetail (so the drawer can update without a second fetch), or null when the
+// item doesn't exist or isn't owned by `userId`.
+//
+// Only fields present in `data` are written — the client sends the type-relevant
+// fields, so a missing `content`/`url`/`language` is left untouched rather than
+// nulled. Tags are replaced wholesale: `set: []` disconnects the existing set,
+// then `connectOrCreate` re-attaches (creating any new per-user tags).
+export async function updateItem(
+  userId: string,
+  id: string,
+  data: UpdateItemInput,
+): Promise<ItemDetail | null> {
+  const existing = await prisma.item.findFirst({
+    where: { id, userId },
+    select: { id: true },
+  });
+  if (!existing) return null;
+
+  const updateData: Prisma.ItemUpdateInput = {
+    title: data.title,
+    description: data.description ?? null,
+    tags: {
+      set: [],
+      connectOrCreate: data.tags.map((name) => ({
+        where: { name_userId: { name, userId } },
+        create: { name, user: { connect: { id: userId } } },
+      })),
+    },
+  };
+
+  // Type-specific fields: only overwrite when the client sent them.
+  if (data.content !== undefined) updateData.content = data.content;
+  if (data.url !== undefined) updateData.url = data.url;
+  if (data.language !== undefined) updateData.language = data.language;
+
+  await prisma.item.update({ where: { id }, data: updateData });
+
+  return getItemDetail(userId, id);
 }
 
 // Pinned items for the given user, newest first.
