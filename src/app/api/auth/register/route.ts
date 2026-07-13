@@ -6,6 +6,7 @@ import { registerSchema } from "@/lib/validations/auth";
 import { createVerificationToken } from "@/lib/tokens";
 import { sendVerificationEmail } from "@/lib/email";
 import { isEmailVerificationEnabled } from "@/lib/auth-flags";
+import { getAppUrl } from "@/lib/app-url";
 
 // Matches the seed script's cost factor so hashes are consistent across sources.
 const BCRYPT_ROUNDS = 12;
@@ -44,9 +45,10 @@ export async function POST(request: Request) {
     const user = await prisma.user.create({
       // When verification is off, mark the account trusted at creation so
       // re-enabling the flag later never strands existing users.
+      // `passwordChangedAt` seeds the session-invalidation baseline.
       data: verificationEnabled
-        ? { name, email, passwordHash }
-        : { name, email, passwordHash, emailVerified: new Date() },
+        ? { name, email, passwordHash, passwordChangedAt: new Date() }
+        : { name, email, passwordHash, passwordChangedAt: new Date(), emailVerified: new Date() },
       select: { id: true, name: true, email: true },
     });
 
@@ -56,7 +58,7 @@ export async function POST(request: Request) {
     if (verificationEnabled) {
       try {
         const token = await createVerificationToken(email);
-        await sendVerificationEmail(email, token, new URL(request.url).origin);
+        await sendVerificationEmail(email, token, getAppUrl());
       } catch (emailErr) {
         console.error("Failed to send verification email:", emailErr);
       }

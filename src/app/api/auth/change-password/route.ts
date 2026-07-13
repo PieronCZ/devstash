@@ -56,9 +56,11 @@ export async function POST(request: Request) {
   }
 
   const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
+  // Bump `passwordChangedAt` so every session issued before now (including this
+  // one) is invalidated on its next request (see the jwt callback in auth.ts).
   await prisma.user.update({
     where: { id: session.user.id },
-    data: { passwordHash },
+    data: { passwordHash, passwordChangedAt: new Date() },
   });
 
   return NextResponse.json({ message: "Password updated." }, { status: 200 });

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { signOut } from "next-auth/react";
 import { LoaderCircle } from "lucide-react";
 
 import { changePasswordSchema } from "@/lib/validations/auth";
@@ -18,7 +19,6 @@ export function ChangePasswordCard() {
   const [form, setForm] = useState(EMPTY_FORM);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [formError, setFormError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
   const [pending, setPending] = useState(false);
 
   function update(field: keyof typeof form) {
@@ -35,7 +35,6 @@ export function ChangePasswordCard() {
 
   function toggle() {
     if (open) reset();
-    setSuccess(false);
     setOpen((prev) => !prev);
   }
 
@@ -70,9 +69,9 @@ export function ChangePasswordCard() {
         return;
       }
 
-      reset();
-      setOpen(false);
-      setSuccess(true);
+      // Changing the password invalidates every existing session (including this
+      // one). Sign out and send the user back to sign in with their new password.
+      await signOut({ callbackUrl: "/sign-in?reset=1" });
     } catch {
       setFormError("Something went wrong. Please try again.");
       setPending(false);
@@ -92,12 +91,6 @@ export function ChangePasswordCard() {
           {open ? "Cancel" : "Change password"}
         </Button>
       </div>
-
-      {success ? (
-        <p className="mt-4 text-sm text-emerald-500" role="status">
-          Your password has been updated.
-        </p>
-      ) : null}
 
       {open ? (
         <form
