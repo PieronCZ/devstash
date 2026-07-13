@@ -9,7 +9,9 @@ export const proxy = auth((req) => {
   const isLoggedIn = !!req.auth;
   const { pathname } = req.nextUrl;
   const isProtected =
-    pathname.startsWith("/dashboard") || pathname.startsWith("/profile");
+    pathname.startsWith("/dashboard") ||
+    pathname.startsWith("/items") ||
+    pathname.startsWith("/profile");
 
   if (isProtected && !isLoggedIn) {
     // Redirect to the custom sign-in page, preserving where the user was
@@ -21,5 +23,5 @@ export const proxy = auth((req) => {
 });
 
 export const config = {
-  matcher: ["/dashboard/:path*", "/profile/:path*"],
+  matcher: ["/dashboard/:path*", "/items/:path*", "/profile/:path*"],
 };
