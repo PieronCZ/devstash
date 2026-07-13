@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { Ratelimit } from "@upstash/ratelimit";
 import { Redis } from "@upstash/redis";
 import { formatRetryAfter } from "@/lib/format";
+import { isRateLimitingEnabled } from "@/lib/auth-flags";
 
 // ─────────────────────────── Upstash client ───────────────────────────
 //
@@ -58,13 +59,16 @@ export interface RateLimitResult {
   reset: number;
 }
 
-// Run a limiter for `key`. Fails open on any error (or a disabled limiter) so a
-// Redis outage never blocks authentication.
+// Run a limiter for `key`. Fails open when limiting is disabled (see
+// isRateLimitingEnabled — off in dev), when there's no limiter (missing Upstash
+// creds), or on any error, so neither dev nor a Redis outage blocks auth.
 export async function checkRateLimit(
   limiter: Ratelimit | null,
   key: string,
 ): Promise<RateLimitResult> {
-  if (!limiter) return { success: true, remaining: Number.POSITIVE_INFINITY, reset: 0 };
+  if (!limiter || !isRateLimitingEnabled()) {
+    return { success: true, remaining: Number.POSITIVE_INFINITY, reset: 0 };
+  }
 
   try {
     const { success, remaining, reset } = await limiter.limit(key);
