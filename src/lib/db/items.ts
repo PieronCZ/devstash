@@ -185,6 +185,56 @@ export async function updateItem(
   return getItemDetail(userId, id);
 }
 
+// Flip an item's favorite flag, scoped to its owner. Returns the new value, or
+// null when the item doesn't exist or isn't owned by `userId` (caller reports
+// "not found"). `updateMany`'s owner-scoped `where` keeps the write safe even
+// though we've already confirmed ownership on the read.
+export async function toggleItemFavorite(
+  userId: string,
+  id: string,
+): Promise<boolean | null> {
+  const item = await prisma.item.findFirst({
+    where: { id, userId },
+    select: { isFavorite: true },
+  });
+  if (!item) return null;
+
+  const next = !item.isFavorite;
+  await prisma.item.updateMany({
+    where: { id, userId },
+    data: { isFavorite: next },
+  });
+  return next;
+}
+
+// Flip an item's pinned flag, scoped to its owner. Same contract as
+// `toggleItemFavorite`.
+export async function toggleItemPin(
+  userId: string,
+  id: string,
+): Promise<boolean | null> {
+  const item = await prisma.item.findFirst({
+    where: { id, userId },
+    select: { isPinned: true },
+  });
+  if (!item) return null;
+
+  const next = !item.isPinned;
+  await prisma.item.updateMany({
+    where: { id, userId },
+    data: { isPinned: next },
+  });
+  return next;
+}
+
+// Permanently delete an item, scoped to its owner. `deleteMany` returns a count,
+// so a non-owner (or missing item) deletes nothing; returns whether a row was
+// removed.
+export async function deleteItem(userId: string, id: string): Promise<boolean> {
+  const { count } = await prisma.item.deleteMany({ where: { id, userId } });
+  return count > 0;
+}
+
 // Pinned items for the given user, newest first.
 export async function getPinnedItems(userId: string): Promise<DashboardItem[]> {
   const items = await prisma.item.findMany({

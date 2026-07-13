@@ -3,9 +3,13 @@
 import { revalidatePath } from "next/cache";
 
 import { auth } from "@/auth";
-import { prisma } from "@/lib/prisma";
 import type { ItemDetail } from "@/lib/db/items";
-import { updateItem as updateItemQuery } from "@/lib/db/items";
+import {
+  deleteItem as deleteItemQuery,
+  toggleItemFavorite as toggleItemFavoriteQuery,
+  toggleItemPin as toggleItemPinQuery,
+  updateItem as updateItemQuery,
+} from "@/lib/db/items";
 import { updateItemSchema } from "@/lib/validations/items";
 
 // Result shape shared by the item mutations — mirrors the project's
@@ -34,17 +38,8 @@ export async function toggleFavorite(
   const userId = await requireUserId();
   if (!userId) return { success: false, error: "Not authenticated" };
 
-  const item = await prisma.item.findFirst({
-    where: { id, userId },
-    select: { isFavorite: true },
-  });
-  if (!item) return { success: false, error: "Item not found" };
-
-  const next = !item.isFavorite;
-  await prisma.item.updateMany({
-    where: { id, userId },
-    data: { isFavorite: next },
-  });
+  const next = await toggleItemFavoriteQuery(userId, id);
+  if (next === null) return { success: false, error: "Item not found" };
 
   revalidateItemViews();
   return { success: true, isFavorite: next };
@@ -57,17 +52,8 @@ export async function togglePin(
   const userId = await requireUserId();
   if (!userId) return { success: false, error: "Not authenticated" };
 
-  const item = await prisma.item.findFirst({
-    where: { id, userId },
-    select: { isPinned: true },
-  });
-  if (!item) return { success: false, error: "Item not found" };
-
-  const next = !item.isPinned;
-  await prisma.item.updateMany({
-    where: { id, userId },
-    data: { isPinned: next },
-  });
+  const next = await toggleItemPinQuery(userId, id);
+  if (next === null) return { success: false, error: "Item not found" };
 
   revalidateItemViews();
   return { success: true, isPinned: next };
@@ -99,14 +85,14 @@ export async function updateItem(
   return { success: true, item };
 }
 
-// Permanently delete an item. `deleteMany` scopes the write to the owner and
-// returns a count, so a non-owner deletes nothing and gets "not found".
+// Permanently delete an item. The owner-scoped write lives in the query layer;
+// a non-owner (or missing item) deletes nothing and gets "not found".
 export async function deleteItem(id: string): Promise<ActionResult> {
   const userId = await requireUserId();
   if (!userId) return { success: false, error: "Not authenticated" };
 
-  const { count } = await prisma.item.deleteMany({ where: { id, userId } });
-  if (count === 0) return { success: false, error: "Item not found" };
+  const deleted = await deleteItemQuery(userId, id);
+  if (!deleted) return { success: false, error: "Item not found" };
 
   revalidateItemViews();
   return { success: true };
