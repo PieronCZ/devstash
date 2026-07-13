@@ -16,7 +16,7 @@ This is the common workflow that we will use for every single feature/fix:
 1. **Document** - Document the feature in @context/current-feature.md.
 2. **Branch** - Create new branch for feature, fix, etc
 3. **Implement** - Implement the feature/fix that I create in @context/current-feature.md
-4. **Test** - Verify it works in the browser. Implement unit testing later. Run `npm run build` and fix any errors
+4. **Test** - Verify it works in the browser. Write/update **Vitest unit tests** for any server actions or utilities the change touches (not components — see Testing below). Run `npm test` and `npm run build`, and fix any errors
 5. **Iterate** - Iterate and change things if needed
 6. **Commit** - Only after build passes and everything works
 7. **Merge** - Merge to main
@@ -27,6 +27,17 @@ This is the common workflow that we will use for every single feature/fix:
 Do NOT commit without permission and until the build passes. If build fails, fix the issues first.
 
 Don't run npm run build while npm run dev is running against the same folder. If you need to verify a production build during a session, you should stop current dev server first.
+
+## Testing
+
+We use **Vitest** for unit tests, scoped to **business logic only**:
+
+- **Test:** server actions (`src/actions/**`) and utilities/lib (`src/lib/**`) — pure functions, validation schemas, and data-shaping logic.
+- **Don't test:** React components / UI (no jsdom, no render tests). Browser verification covers those for now.
+- Co-locate tests next to their source as `*.test.ts` (e.g. `src/lib/format.test.ts`). Import `describe/it/expect` from `vitest` (globals are off).
+- Mock external boundaries (Prisma, Resend, Upstash, network) rather than hitting them; prefer testing the pure logic around them.
+- Commands: `npm test` (run once), `npm run test:watch` (watch mode), `npm run test:coverage` (coverage report).
+- A change that touches a server action or utility should add or update its tests before commit; `npm test` must pass alongside `npm run build`.
 
 ## Branching
 

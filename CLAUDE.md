@@ -25,11 +25,22 @@ Read the following to get the full context of the project:
 ## Commands
 
 ```bash
-npm run dev     # start dev server (http://localhost:3000)
-npm run build   # production build
-npm run start   # serve the production build
-npm run lint    # ESLint (flat config)
+npm run dev            # start dev server (http://localhost:3000)
+npm run build          # production build
+npm run start          # serve the production build
+npm run lint           # ESLint (flat config)
+npm test               # Vitest — unit tests (server actions + utilities only)
+npm run test:watch     # Vitest in watch mode
+npm run test:coverage  # Vitest with coverage report
 ```
+
+## Testing
+
+Vitest, Node environment, scoped to **business logic only** — server actions
+(`src/actions/**`) and utilities (`src/lib/**`). **No component/UI tests.**
+Tests are co-located as `*.test.ts`; import `describe/it/expect` from `vitest`.
+Mock external boundaries (Prisma, Resend, Upstash) rather than hitting them.
+See `context/ai-interaction.md` → Testing.
 
 ## Neon Database (MCP)
 

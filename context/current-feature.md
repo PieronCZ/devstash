@@ -2,15 +2,20 @@
 
 ## Status
 
-Not Started
+In Progress
 
 ## Goals
 
-<!-- Bullet points of what success looks like -->
+- Set up Vitest for unit testing, scoped to **server actions and utilities only** (no component/UI tests).
+- Node test environment (no jsdom), `@/` path alias, `npm test` / `test:watch` / `test:coverage` scripts.
+- Seed real starter tests for the pure utilities so the harness is proven end-to-end.
+- Update the workflow docs so unit testing is part of the standard feature cycle.
 
 ## Notes
 
-<!-- Additional context, constraints, or details from spec -->
+- Only test pure/business logic: `src/lib/**` utilities and (future) `src/actions/**` server actions. Deliberately **not** testing React components.
+- Tests co-located next to source as `*.test.ts`. Vitest globals off — import `describe/it/expect` from `vitest`.
+- `src/actions` does not exist yet; first server-action tests will land with the Items CRUD work.
 
 ## History
 
