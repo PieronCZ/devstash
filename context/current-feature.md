@@ -1,16 +1,22 @@
-# Current Feature
+# Current Feature — Items List: 3-Column Grid
 
 ## Status
 
-Not Started
+In Progress
 
 ## Goals
 
-<!-- Bullet points of what success looks like -->
+- The item listing view at `/items/[type]` shows **3 columns** on larger screens instead of 2.
+- Grid stays responsive: single column on mobile, scaling up to 3 on wide screens.
+- The loading skeleton grid matches the new column layout.
 
 ## Notes
 
-<!-- Additional context, constraints, or details from spec -->
+- Target grid: [items/[type]/page.tsx:52](src/app/items/[type]/page.tsx#L52) — currently `grid gap-4 md:grid-cols-2`.
+- Matching skeleton: [items/[type]/loading.tsx:17](src/app/items/[type]/loading.tsx#L17) — currently `grid gap-4 md:grid-cols-2`.
+- Proposed classes: `grid gap-4 sm:grid-cols-2 lg:grid-cols-3` (1 col mobile, 2 at sm, 3 at lg) — mirrors the responsive stepping already used on the dashboard grids.
+- Scope: item listing view only. Dashboard recent-items/collections grids are out of scope unless asked.
+- No DB, no server-action, no utility changes — pure Tailwind class change, so no Vitest work expected.
 
 ## History
 

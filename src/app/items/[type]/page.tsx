@@ -47,9 +47,9 @@ export default async function ItemsByTypePage({
         </p>
       </div>
 
-      {/* Items grid — two columns on medium screens and up */}
+      {/* Items grid — responsive: 1 col mobile, 2 at sm, 3 at lg */}
       {items.length > 0 ? (
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {items.map((item) => (
             <ItemCard key={item.id} item={item} />
           ))}
