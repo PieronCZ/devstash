@@ -84,6 +84,16 @@ Example v4 configuration:
 - Client components use Server Actions
 - Validate all inputs with Zod
 
+## Testing
+
+- **Vitest** for unit tests, Node environment (no jsdom).
+- Test **server actions** (`src/actions/**`) and **utilities/lib** (`src/lib/**`) — pure logic, Zod schemas, data shaping.
+- **Do not** unit-test React components or UI; browser verification covers those.
+- Co-locate tests as `*.test.ts` next to their source. Import `describe/it/expect` from `vitest` (no globals).
+- Mock external boundaries (Prisma, Resend, Upstash, `fetch`); don't hit real services in unit tests.
+- Keep tests deterministic — use `vi.useFakeTimers()` / `vi.stubEnv()` for time- and env-dependent logic.
+- `npm test` must pass before committing.
+
 ## Error Handling
 
 - Use try/catch in Server Actions
