@@ -48,11 +48,13 @@ export async function AppShell({
 
   return (
     <TooltipProvider>
-      <SidebarProvider defaultOpen={defaultOpen}>
+      {/* Cap the shell at the viewport height so the top bar stays fixed and only
+          the content area scrolls (see the scrollable <main> below). */}
+      <SidebarProvider defaultOpen={defaultOpen} className="h-svh">
         <AppSidebar itemTypes={itemTypes} collections={collections} user={user} />
-        <SidebarInset>
+        <SidebarInset className="min-h-0 overflow-hidden">
           <TopBar />
-          <main className="flex-1 p-6">
+          <main className="min-h-0 flex-1 overflow-y-auto p-6">
             <ItemDrawerProvider>{children}</ItemDrawerProvider>
           </main>
         </SidebarInset>
