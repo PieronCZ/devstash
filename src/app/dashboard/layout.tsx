@@ -1,4 +1,5 @@
 import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
 
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
@@ -18,20 +19,22 @@ export default async function DashboardLayout({
   const cookieStore = await cookies();
   const defaultOpen = cookieStore.get("sidebar_state")?.value !== "false";
 
-  const [session, itemTypes, collections] = await Promise.all([
-    auth(),
-    getSidebarItemTypes(),
-    getSidebarCollections(),
-  ]);
+  // The proxy guarantees a session on /dashboard, but resolve it first so the
+  // sidebar reads are scoped to this user.
+  const session = await auth();
+  const userId = session?.user?.id;
+  if (!userId) redirect("/sign-in");
 
-  // The proxy guarantees a session here, but `isPro` isn't on the token —
-  // fetch it (and the freshest name/image) for the footer user card.
-  const dbUser = session?.user?.id
-    ? await prisma.user.findUnique({
-        where: { id: session.user.id },
-        select: { name: true, email: true, image: true, isPro: true },
-      })
-    : null;
+  const [itemTypes, collections, dbUser] = await Promise.all([
+    getSidebarItemTypes(userId),
+    getSidebarCollections(userId),
+    // `isPro` isn't on the token — fetch it (and the freshest name/image) for
+    // the footer user card.
+    prisma.user.findUnique({
+      where: { id: userId },
+      select: { name: true, email: true, image: true, isPro: true },
+    }),
+  ]);
 
   const user: SidebarUser = {
     name: dbUser?.name ?? session?.user?.name ?? null,

@@ -1,6 +1,8 @@
 import type { LucideIcon } from "lucide-react";
 import { Boxes, Clock, FolderHeart, FolderOpen, LayoutGrid, Pin, Star } from "lucide-react";
+import { redirect } from "next/navigation";
 
+import { auth } from "@/auth";
 import { getRecentCollections } from "@/lib/db/collections";
 import { getItemStats, getPinnedItems, getRecentItems } from "@/lib/db/items";
 import { CollectionCard } from "@/components/dashboard/CollectionCard";
@@ -23,12 +25,16 @@ function SectionHeader({
 }
 
 export default async function DashboardPage() {
+  const session = await auth();
+  const userId = session?.user?.id;
+  if (!userId) redirect("/sign-in");
+
   const [recentCollections, itemStats, pinnedItems, recentItems] =
     await Promise.all([
-      getRecentCollections(),
-      getItemStats(),
-      getPinnedItems(),
-      getRecentItems(10),
+      getRecentCollections(userId),
+      getItemStats(userId),
+      getPinnedItems(userId),
+      getRecentItems(userId, 10),
     ]);
 
   const favoriteCollections = recentCollections.filter(
