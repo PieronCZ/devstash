@@ -120,6 +120,50 @@ export async function getItemStats(userId: string): Promise<{
   return { total, favorites };
 }
 
+// Resolve a route param (e.g. "snippet", or the plural "snippets") to the
+// canonical system-type name. Returns null for anything that isn't a system
+// type so the caller can 404.
+export function resolveSystemTypeName(param: string): string | null {
+  const name = param.toLowerCase();
+  if (SYSTEM_TYPE_ORDER.includes(name)) return name;
+  // Tolerate the plural route form used in the spec (/items/snippets).
+  if (name.endsWith("s") && SYSTEM_TYPE_ORDER.includes(name.slice(0, -1))) {
+    return name.slice(0, -1);
+  }
+  return null;
+}
+
+// A resolved system item type — its display metadata for the list header.
+export interface ResolvedItemType {
+  id: string;
+  name: string;
+  icon: string; // lucide icon name
+  color: string; // hex
+}
+
+// Look up a system item type by its canonical name (icon/color for the header).
+export async function getSystemItemType(
+  name: string,
+): Promise<ResolvedItemType | null> {
+  return prisma.itemType.findFirst({
+    where: { isSystem: true, name },
+    select: { id: true, name: true, icon: true, color: true },
+  });
+}
+
+// All of the given user's items of one type, newest first (pinned float to top).
+export async function getItemsByType(
+  userId: string,
+  typeName: string,
+): Promise<DashboardItem[]> {
+  const items = await prisma.item.findMany({
+    where: { userId, itemType: { name: typeName, isSystem: true } },
+    orderBy: [{ isPinned: "desc" }, { updatedAt: "desc" }],
+    select: itemSelect,
+  });
+  return items.map(toDashboardItem);
+}
+
 // A system item type as shown in the sidebar's Types list.
 export interface SidebarItemType {
   id: string;
