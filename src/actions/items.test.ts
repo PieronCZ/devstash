@@ -7,26 +7,20 @@ import {
   updateItem,
 } from "@/actions/items";
 
-// Mock the external boundaries: auth + Prisma + Next's cache helper.
+// Mock the external boundaries: auth + the query layer + Next's cache helper.
+// The actions are now a thin auth/validation/revalidate shell — every
+// owner-scoped DB write lives in `@/lib/db/items` (tested there against Prisma).
 const auth = vi.fn();
 vi.mock("@/auth", () => ({ auth: () => auth() }));
 
-const findFirst = vi.fn();
-const updateMany = vi.fn();
-const deleteMany = vi.fn();
-vi.mock("@/lib/prisma", () => ({
-  prisma: {
-    item: {
-      findFirst: (...args: unknown[]) => findFirst(...args),
-      updateMany: (...args: unknown[]) => updateMany(...args),
-      deleteMany: (...args: unknown[]) => deleteMany(...args),
-    },
-  },
-}));
-
-// The update action delegates the owner-scoped write to the query layer.
+const toggleItemFavorite = vi.fn();
+const toggleItemPin = vi.fn();
+const deleteItemQuery = vi.fn();
 const updateItemQuery = vi.fn();
 vi.mock("@/lib/db/items", () => ({
+  toggleItemFavorite: (...args: unknown[]) => toggleItemFavorite(...args),
+  toggleItemPin: (...args: unknown[]) => toggleItemPin(...args),
+  deleteItem: (...args: unknown[]) => deleteItemQuery(...args),
   updateItem: (...args: unknown[]) => updateItemQuery(...args),
 }));
 
@@ -42,32 +36,26 @@ describe("toggleFavorite", () => {
     auth.mockResolvedValue(null);
     const res = await toggleFavorite("item-1");
     expect(res).toEqual({ success: false, error: "Not authenticated" });
-    expect(findFirst).not.toHaveBeenCalled();
+    expect(toggleItemFavorite).not.toHaveBeenCalled();
   });
 
-  it("returns not found when the item isn't the user's", async () => {
-    findFirst.mockResolvedValue(null);
+  it("returns not found when the query reports no owned item", async () => {
+    toggleItemFavorite.mockResolvedValue(null);
     const res = await toggleFavorite("item-1");
     expect(res).toEqual({ success: false, error: "Item not found" });
-    expect(updateMany).not.toHaveBeenCalled();
   });
 
-  it("flips false to true and scopes the write to the owner", async () => {
-    findFirst.mockResolvedValue({ isFavorite: false });
-    updateMany.mockResolvedValue({ count: 1 });
+  it("returns the new flag and delegates the owner-scoped write", async () => {
+    toggleItemFavorite.mockResolvedValue(true);
 
     const res = await toggleFavorite("item-1");
 
     expect(res).toEqual({ success: true, isFavorite: true });
-    expect(updateMany).toHaveBeenCalledWith({
-      where: { id: "item-1", userId: "user-1" },
-      data: { isFavorite: true },
-    });
+    expect(toggleItemFavorite).toHaveBeenCalledWith("user-1", "item-1");
   });
 
-  it("flips true to false", async () => {
-    findFirst.mockResolvedValue({ isFavorite: true });
-    updateMany.mockResolvedValue({ count: 1 });
+  it("surfaces a flip to false (not treated as not-found)", async () => {
+    toggleItemFavorite.mockResolvedValue(false);
 
     const res = await toggleFavorite("item-1");
 
@@ -82,23 +70,27 @@ describe("togglePin", () => {
     expect(res).toEqual({ success: false, error: "Not authenticated" });
   });
 
-  it("returns not found when the item isn't the user's", async () => {
-    findFirst.mockResolvedValue(null);
+  it("returns not found when the query reports no owned item", async () => {
+    toggleItemPin.mockResolvedValue(null);
     const res = await togglePin("item-1");
     expect(res).toEqual({ success: false, error: "Item not found" });
   });
 
-  it("flips the pinned flag and scopes the write", async () => {
-    findFirst.mockResolvedValue({ isPinned: false });
-    updateMany.mockResolvedValue({ count: 1 });
+  it("returns the new flag and delegates the owner-scoped write", async () => {
+    toggleItemPin.mockResolvedValue(true);
 
     const res = await togglePin("item-1");
 
     expect(res).toEqual({ success: true, isPinned: true });
-    expect(updateMany).toHaveBeenCalledWith({
-      where: { id: "item-1", userId: "user-1" },
-      data: { isPinned: true },
-    });
+    expect(toggleItemPin).toHaveBeenCalledWith("user-1", "item-1");
+  });
+
+  it("surfaces a flip to false (not treated as not-found)", async () => {
+    toggleItemPin.mockResolvedValue(false);
+
+    const res = await togglePin("item-1");
+
+    expect(res).toEqual({ success: true, isPinned: false });
   });
 });
 
@@ -107,24 +99,22 @@ describe("deleteItem", () => {
     auth.mockResolvedValue(null);
     const res = await deleteItem("item-1");
     expect(res).toEqual({ success: false, error: "Not authenticated" });
-    expect(deleteMany).not.toHaveBeenCalled();
+    expect(deleteItemQuery).not.toHaveBeenCalled();
   });
 
   it("returns not found when nothing was deleted", async () => {
-    deleteMany.mockResolvedValue({ count: 0 });
+    deleteItemQuery.mockResolvedValue(false);
     const res = await deleteItem("item-1");
     expect(res).toEqual({ success: false, error: "Item not found" });
   });
 
-  it("deletes scoped to the owner and reports success", async () => {
-    deleteMany.mockResolvedValue({ count: 1 });
+  it("delegates the owner-scoped delete and reports success", async () => {
+    deleteItemQuery.mockResolvedValue(true);
 
     const res = await deleteItem("item-1");
 
     expect(res).toEqual({ success: true });
-    expect(deleteMany).toHaveBeenCalledWith({
-      where: { id: "item-1", userId: "user-1" },
-    });
+    expect(deleteItemQuery).toHaveBeenCalledWith("user-1", "item-1");
   });
 });
 

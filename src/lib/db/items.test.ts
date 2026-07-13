@@ -1,12 +1,21 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { getItemDetail } from "@/lib/db/items";
+import {
+  deleteItem,
+  getItemDetail,
+  toggleItemFavorite,
+  toggleItemPin,
+} from "@/lib/db/items";
 
 const findFirst = vi.fn();
+const updateMany = vi.fn();
+const deleteMany = vi.fn();
 vi.mock("@/lib/prisma", () => ({
   prisma: {
     item: {
       findFirst: (...args: unknown[]) => findFirst(...args),
+      updateMany: (...args: unknown[]) => updateMany(...args),
+      deleteMany: (...args: unknown[]) => deleteMany(...args),
     },
   },
 }));
@@ -103,5 +112,70 @@ describe("getItemDetail", () => {
     expect(detail?.tags).toEqual([]);
     expect(detail?.collections).toEqual([]);
     expect(detail?.description).toBeNull();
+  });
+});
+
+describe("toggleItemFavorite", () => {
+  it("returns null when the item isn't found / not owned", async () => {
+    findFirst.mockResolvedValue(null);
+    expect(await toggleItemFavorite("user-1", "item-1")).toBeNull();
+    expect(updateMany).not.toHaveBeenCalled();
+  });
+
+  it("flips false to true and scopes both the read and write to the owner", async () => {
+    findFirst.mockResolvedValue({ isFavorite: false });
+    updateMany.mockResolvedValue({ count: 1 });
+
+    expect(await toggleItemFavorite("user-1", "item-1")).toBe(true);
+    expect(findFirst).toHaveBeenCalledWith({
+      where: { id: "item-1", userId: "user-1" },
+      select: { isFavorite: true },
+    });
+    expect(updateMany).toHaveBeenCalledWith({
+      where: { id: "item-1", userId: "user-1" },
+      data: { isFavorite: true },
+    });
+  });
+
+  it("flips true to false", async () => {
+    findFirst.mockResolvedValue({ isFavorite: true });
+    updateMany.mockResolvedValue({ count: 1 });
+
+    expect(await toggleItemFavorite("user-1", "item-1")).toBe(false);
+  });
+});
+
+describe("toggleItemPin", () => {
+  it("returns null when the item isn't found / not owned", async () => {
+    findFirst.mockResolvedValue(null);
+    expect(await toggleItemPin("user-1", "item-1")).toBeNull();
+    expect(updateMany).not.toHaveBeenCalled();
+  });
+
+  it("flips the pinned flag and scopes the write to the owner", async () => {
+    findFirst.mockResolvedValue({ isPinned: false });
+    updateMany.mockResolvedValue({ count: 1 });
+
+    expect(await toggleItemPin("user-1", "item-1")).toBe(true);
+    expect(updateMany).toHaveBeenCalledWith({
+      where: { id: "item-1", userId: "user-1" },
+      data: { isPinned: true },
+    });
+  });
+});
+
+describe("deleteItem", () => {
+  it("returns false when nothing was deleted (missing / not owned)", async () => {
+    deleteMany.mockResolvedValue({ count: 0 });
+    expect(await deleteItem("user-1", "item-1")).toBe(false);
+  });
+
+  it("deletes scoped to the owner and returns true", async () => {
+    deleteMany.mockResolvedValue({ count: 1 });
+
+    expect(await deleteItem("user-1", "item-1")).toBe(true);
+    expect(deleteMany).toHaveBeenCalledWith({
+      where: { id: "item-1", userId: "user-1" },
+    });
   });
 });
