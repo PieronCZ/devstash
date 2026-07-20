@@ -5,12 +5,13 @@ import { revalidatePath } from "next/cache";
 import { auth } from "@/auth";
 import type { ItemDetail } from "@/lib/db/items";
 import {
+  createItem as createItemQuery,
   deleteItem as deleteItemQuery,
   toggleItemFavorite as toggleItemFavoriteQuery,
   toggleItemPin as toggleItemPinQuery,
   updateItem as updateItemQuery,
 } from "@/lib/db/items";
-import { updateItemSchema } from "@/lib/validations/items";
+import { createItemSchema, updateItemSchema } from "@/lib/validations/items";
 
 // Result shape shared by the item mutations — mirrors the project's
 // { success, data, error } convention (data folded in on success).
@@ -57,6 +58,31 @@ export async function togglePin(
 
   revalidateItemViews();
   return { success: true, isPinned: next };
+}
+
+// Create a new item from the New Item dialog. Validates the payload with Zod
+// (source of truth for required/type-specific fields), then delegates the write
+// to the query layer. Returns the created detail; the first Zod issue is
+// surfaced as `error` for inline display.
+export async function createItem(
+  input: unknown,
+): Promise<ActionResult<{ item: ItemDetail }>> {
+  const userId = await requireUserId();
+  if (!userId) return { success: false, error: "Not authenticated" };
+
+  const parsed = createItemSchema.safeParse(input);
+  if (!parsed.success) {
+    return {
+      success: false,
+      error: parsed.error.issues[0]?.message ?? "Validation failed",
+    };
+  }
+
+  const item = await createItemQuery(userId, parsed.data);
+  if (!item) return { success: false, error: "Could not create item" };
+
+  revalidateItemViews();
+  return { success: true, item };
 }
 
 // Update an item's editable fields. Validates the payload with Zod (source of

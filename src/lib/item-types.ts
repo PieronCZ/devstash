@@ -16,3 +16,33 @@ export const SYSTEM_TYPE_ORDER: readonly string[] = [
 
 // System item types gated behind a Pro plan — flagged with a PRO badge in the UI.
 export const PRO_TYPES: ReadonlySet<string> = new Set(["file", "image"]);
+
+// System types a user can create through the New Item dialog. The Pro-only
+// file/image types need an upload flow, so they're excluded here. Order matches
+// the dialog's type selector.
+export const CREATABLE_SYSTEM_TYPES = [
+  "snippet",
+  "prompt",
+  "command",
+  "note",
+  "link",
+] as const;
+
+export type CreatableSystemType = (typeof CREATABLE_SYSTEM_TYPES)[number];
+
+// Resolve a route param — singular or plural, any case (e.g. "snippet",
+// "snippets", "Links") — to a creatable system type, or null when it isn't one
+// (the dashboard, or the Pro-only file/image types). Used to seed the New Item
+// dialog's type from the current /items/[type] page. Pure/client-safe.
+export function resolveCreatableType(
+  param: string | null | undefined,
+): CreatableSystemType | null {
+  if (!param) return null;
+  const name = param.toLowerCase();
+  const creatable = CREATABLE_SYSTEM_TYPES as readonly string[];
+  if (creatable.includes(name)) return name as CreatableSystemType;
+  if (name.endsWith("s") && creatable.includes(name.slice(0, -1))) {
+    return name.slice(0, -1) as CreatableSystemType;
+  }
+  return null;
+}

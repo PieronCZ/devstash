@@ -1,0 +1,345 @@
+"use client";
+
+import { createElement, useState, useTransition } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import {
+  Code,
+  Link as LinkIcon,
+  Plus,
+  Sparkles,
+  StickyNote,
+  Terminal,
+  type LucideIcon,
+} from "lucide-react";
+
+import { createItem } from "@/actions/items";
+import {
+  CREATABLE_SYSTEM_TYPES,
+  resolveCreatableType,
+  type CreatableSystemType,
+} from "@/lib/item-types";
+import { TagInput } from "@/components/dashboard/TagInput";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+
+// Display metadata for each creatable type's selector option — label, icon, and
+// the type's brand color (matches the system-type colors used across the app).
+const TYPE_META: Record<
+  CreatableSystemType,
+  { label: string; icon: LucideIcon; color: string }
+> = {
+  snippet: { label: "Snippet", icon: Code, color: "#3b82f6" },
+  prompt: { label: "Prompt", icon: Sparkles, color: "#8b5cf6" },
+  command: { label: "Command", icon: Terminal, color: "#f97316" },
+  note: { label: "Note", icon: StickyNote, color: "#fde047" },
+  link: { label: "Link", icon: LinkIcon, color: "#10b981" },
+};
+
+function FieldLabel({
+  htmlFor,
+  required,
+  children,
+}: {
+  htmlFor: string;
+  required?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <label
+      htmlFor={htmlFor}
+      className="text-xs font-semibold tracking-wider text-muted-foreground uppercase"
+    >
+      {children}
+      {required ? (
+        <span aria-hidden className="ml-0.5 text-destructive">
+          *
+        </span>
+      ) : null}
+    </label>
+  );
+}
+
+// Default type when opened somewhere without a type context (e.g. dashboard).
+const DEFAULT_TYPE = CREATABLE_SYSTEM_TYPES[0];
+
+// Parse the current pathname (/items/<type>) into a creatable type, or null.
+function typeFromPathname(pathname: string): CreatableSystemType | null {
+  const match = pathname.match(/^\/items\/([^/]+)/);
+  return match ? resolveCreatableType(match[1]) : null;
+}
+
+// "New item" button + modal for creating an item. Controlled local state (no form
+// library, mirroring ItemDrawerEditForm); the server action's Zod schema is the
+// real gate, this only guards the obvious (empty title). Which fields show is
+// driven by the selected type so we never send fields the item can't hold.
+export function CreateItemDialog() {
+  const router = useRouter();
+  const pathname = usePathname();
+  // The type implied by the current /items/[type] page (null elsewhere).
+  const pageType = typeFromPathname(pathname);
+
+  const [open, setOpen] = useState(false);
+  const [pending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+
+  const [type, setType] = useState<CreatableSystemType>(pageType ?? DEFAULT_TYPE);
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [content, setContent] = useState("");
+  const [url, setUrl] = useState("");
+  const [language, setLanguage] = useState("");
+  const [tags, setTags] = useState<string[]>([]);
+
+  const showContent = type !== "link";
+  const showUrl = type === "link";
+  const showLanguage = type === "snippet" || type === "command";
+
+  function resetForm() {
+    setType(pageType ?? DEFAULT_TYPE);
+    setTitle("");
+    setDescription("");
+    setContent("");
+    setUrl("");
+    setLanguage("");
+    setTags([]);
+    setError(null);
+  }
+
+  function handleOpenChange(next: boolean) {
+    setOpen(next);
+    if (next) {
+      // Seed the type from the page we opened on (dashboard → first type).
+      setType(pageType ?? DEFAULT_TYPE);
+    } else {
+      // Start each open from a clean slate.
+      resetForm();
+    }
+  }
+
+  // Changing the type also navigates to that type's list page, keeping the
+  // dialog and the page in sync in both directions.
+  function handleTypeChange(next: CreatableSystemType) {
+    setType(next);
+    if (next !== pageType) router.push(`/items/${next}`);
+  }
+
+  // Native form constraint validation (required inputs) gates submission and
+  // drives the red border via :user-invalid — so this only runs once the form
+  // is valid; no per-field "touched"/"submitted" bookkeeping needed.
+  function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setError(null);
+
+    // Only send the fields the selected type can hold; the query layer maps the
+    // rest. The schema trims/dedupes the tag array.
+    const payload: Record<string, unknown> = {
+      type,
+      title,
+      description,
+      tags,
+    };
+    if (showContent) payload.content = content;
+    if (showUrl) payload.url = url;
+    if (showLanguage) payload.language = language;
+
+    startTransition(async () => {
+      const res = await createItem(payload);
+      if (res.success) {
+        setOpen(false);
+        resetForm();
+        router.refresh();
+      } else {
+        setError(res.error);
+      }
+    });
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      <DialogTrigger render={<Button />}>
+        <Plus className="size-4" />
+        New item
+      </DialogTrigger>
+
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>New item</DialogTitle>
+          <DialogDescription>
+            Stash a snippet, prompt, command, note, or link.
+          </DialogDescription>
+        </DialogHeader>
+
+        <form onSubmit={handleSubmit} className="flex flex-col gap-5">
+          {error ? (
+            <p
+              role="alert"
+              className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+            >
+              {error}
+            </p>
+          ) : null}
+
+          {/* Type */}
+          <div className="flex flex-col gap-1.5">
+            <FieldLabel htmlFor="create-type">Type</FieldLabel>
+            <Select
+              value={type}
+              onValueChange={(value) =>
+                handleTypeChange(value as CreatableSystemType)
+              }
+            >
+              <SelectTrigger id="create-type">
+                <SelectValue>
+                  {(value: string) => {
+                    const meta = TYPE_META[value as CreatableSystemType];
+                    return (
+                      <span className="flex items-center gap-2">
+                        {createElement(meta.icon, {
+                          className: "size-4",
+                          style: { color: meta.color },
+                        })}
+                        {meta.label}
+                      </span>
+                    );
+                  }}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {CREATABLE_SYSTEM_TYPES.map((name) => {
+                  const { label, icon, color } = TYPE_META[name];
+                  return (
+                    <SelectItem key={name} value={name}>
+                      <span className="flex items-center gap-2">
+                        {createElement(icon, {
+                          className: "size-4",
+                          style: { color },
+                        })}
+                        {label}
+                      </span>
+                    </SelectItem>
+                  );
+                })}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Title */}
+          <div className="flex flex-col gap-1.5">
+            <FieldLabel htmlFor="create-title" required>
+              Title
+            </FieldLabel>
+            <Input
+              id="create-title"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              required
+              placeholder="Title"
+            />
+          </div>
+
+          {/* Description */}
+          <div className="flex flex-col gap-1.5">
+            <FieldLabel htmlFor="create-description">Description</FieldLabel>
+            <Textarea
+              id="create-description"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Optional description"
+              rows={2}
+            />
+          </div>
+
+          {/* Content — text-kind items */}
+          {showContent ? (
+            <div className="flex flex-col gap-1.5">
+              <FieldLabel htmlFor="create-content">Content</FieldLabel>
+              <Textarea
+                id="create-content"
+                value={content}
+                onChange={(e) => setContent(e.target.value)}
+                placeholder="Content"
+                rows={8}
+                className="font-mono text-xs"
+              />
+            </div>
+          ) : null}
+
+          {/* Language — snippet & command only */}
+          {showLanguage ? (
+            <div className="flex flex-col gap-1.5">
+              <FieldLabel htmlFor="create-language">Language</FieldLabel>
+              <Input
+                id="create-language"
+                value={language}
+                onChange={(e) => setLanguage(e.target.value)}
+                placeholder="e.g. typescript"
+              />
+            </div>
+          ) : null}
+
+          {/* URL — link items */}
+          {showUrl ? (
+            <div className="flex flex-col gap-1.5">
+              <FieldLabel htmlFor="create-url" required>
+                URL
+              </FieldLabel>
+              <Input
+                id="create-url"
+                type="url"
+                value={url}
+                onChange={(e) => setUrl(e.target.value)}
+                required
+                placeholder="https://…"
+              />
+            </div>
+          ) : null}
+
+          {/* Tags */}
+          <div className="flex flex-col gap-1.5">
+            <FieldLabel htmlFor="create-tags">Tags</FieldLabel>
+            <TagInput
+              id="create-tags"
+              value={tags}
+              onChange={setTags}
+              placeholder="Add tags, or pick existing…"
+            />
+            <p className="text-xs text-muted-foreground">
+              Press Enter or comma to add. Existing tags are suggested as you
+              type.
+            </p>
+          </div>
+          <DialogFooter>
+            <DialogClose
+              render={
+                <Button type="button" variant="outline" disabled={pending} />
+              }
+            >
+              Cancel
+            </DialogClose>
+            <Button type="submit" disabled={pending}>
+              {pending ? "Creating…" : "Create item"}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}

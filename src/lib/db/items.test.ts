@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
+  createItem,
   deleteItem,
   getItemDetail,
   toggleItemFavorite,
@@ -10,12 +11,18 @@ import {
 const findFirst = vi.fn();
 const updateMany = vi.fn();
 const deleteMany = vi.fn();
+const create = vi.fn();
+const itemTypeFindFirst = vi.fn();
 vi.mock("@/lib/prisma", () => ({
   prisma: {
     item: {
       findFirst: (...args: unknown[]) => findFirst(...args),
       updateMany: (...args: unknown[]) => updateMany(...args),
       deleteMany: (...args: unknown[]) => deleteMany(...args),
+      create: (...args: unknown[]) => create(...args),
+    },
+    itemType: {
+      findFirst: (...args: unknown[]) => itemTypeFindFirst(...args),
     },
   },
 }));
@@ -177,5 +184,161 @@ describe("deleteItem", () => {
     expect(deleteMany).toHaveBeenCalledWith({
       where: { id: "item-1", userId: "user-1" },
     });
+  });
+});
+
+describe("createItem", () => {
+  // Minimal detail row returned by the getItemDetail re-fetch after create.
+  const detailRow = {
+    id: "new-1",
+    title: "T",
+    description: null,
+    contentType: "TEXT",
+    content: null,
+    url: null,
+    fileName: null,
+    fileSize: null,
+    language: null,
+    isFavorite: false,
+    isPinned: false,
+    createdAt: new Date("2025-01-01T00:00:00.000Z"),
+    updatedAt: new Date("2025-01-01T00:00:00.000Z"),
+    itemType: { id: "type-1", name: "snippet", icon: "Code", color: "#3b82f6" },
+    tags: [],
+    collections: [],
+  };
+
+  it("returns null when the system type can't be resolved", async () => {
+    itemTypeFindFirst.mockResolvedValue(null);
+
+    const res = await createItem("user-1", {
+      type: "snippet",
+      title: "T",
+      tags: [],
+    });
+
+    expect(res).toBeNull();
+    expect(create).not.toHaveBeenCalled();
+  });
+
+  it("resolves the type by name scoped to system types", async () => {
+    itemTypeFindFirst.mockResolvedValue({ id: "type-1" });
+    create.mockResolvedValue({ id: "new-1" });
+    findFirst.mockResolvedValue(detailRow);
+
+    await createItem("user-1", { type: "note", title: "T", tags: [] });
+
+    expect(itemTypeFindFirst).toHaveBeenCalledWith({
+      where: { isSystem: true, name: "note" },
+      select: { id: true },
+    });
+  });
+
+  it("creates a snippet as TEXT with content + language, url null", async () => {
+    itemTypeFindFirst.mockResolvedValue({ id: "type-1" });
+    create.mockResolvedValue({ id: "new-1" });
+    findFirst.mockResolvedValue(detailRow);
+
+    await createItem("user-1", {
+      type: "snippet",
+      title: "useDebounce",
+      description: "desc",
+      content: "export const x = 1;",
+      language: "typescript",
+      tags: ["react", "hooks"],
+    });
+
+    expect(create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          title: "useDebounce",
+          description: "desc",
+          contentType: "TEXT",
+          content: "export const x = 1;",
+          url: null,
+          language: "typescript",
+          user: { connect: { id: "user-1" } },
+          itemType: { connect: { id: "type-1" } },
+          tags: {
+            connectOrCreate: [
+              {
+                where: { name_userId: { name: "react", userId: "user-1" } },
+                create: { name: "react", user: { connect: { id: "user-1" } } },
+              },
+              {
+                where: { name_userId: { name: "hooks", userId: "user-1" } },
+                create: { name: "hooks", user: { connect: { id: "user-1" } } },
+              },
+            ],
+          },
+        }),
+      }),
+    );
+  });
+
+  it("creates a link as URL with url set, content + language null", async () => {
+    itemTypeFindFirst.mockResolvedValue({ id: "type-2" });
+    create.mockResolvedValue({ id: "new-2" });
+    findFirst.mockResolvedValue(detailRow);
+
+    await createItem("user-1", {
+      type: "link",
+      title: "Docs",
+      url: "https://example.com",
+      tags: [],
+    });
+
+    expect(create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          contentType: "URL",
+          url: "https://example.com",
+          content: null,
+          language: null,
+        }),
+      }),
+    );
+  });
+
+  it("does not set language for non-snippet/command text types", async () => {
+    itemTypeFindFirst.mockResolvedValue({ id: "type-3" });
+    create.mockResolvedValue({ id: "new-3" });
+    findFirst.mockResolvedValue(detailRow);
+
+    await createItem("user-1", {
+      type: "prompt",
+      title: "P",
+      content: "body",
+      // language is not a prompt field — even if present it must be dropped.
+      language: "typescript",
+      tags: [],
+    });
+
+    expect(create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          contentType: "TEXT",
+          content: "body",
+          language: null,
+        }),
+      }),
+    );
+  });
+
+  it("re-fetches the created item as ItemDetail", async () => {
+    itemTypeFindFirst.mockResolvedValue({ id: "type-1" });
+    create.mockResolvedValue({ id: "new-1" });
+    findFirst.mockResolvedValue(detailRow);
+
+    const detail = await createItem("user-1", {
+      type: "snippet",
+      title: "T",
+      tags: [],
+    });
+
+    expect(findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: "new-1", userId: "user-1" } }),
+    );
+    expect(detail?.id).toBe("new-1");
   });
 });
