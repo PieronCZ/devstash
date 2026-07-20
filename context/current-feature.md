@@ -1,30 +1,16 @@
-# Current Feature: Item Create
+# Current Feature
 
 ## Status
 
-In Progress
+Not Started
 
 ## Goals
 
-- Add new items via a shadcn **Dialog** modal, opened from the "New Item" button in the top bar
-- Type selector for the five text/url system types: snippet, prompt, command, note, link (file/image are Pro, excluded)
-- Conditional fields by type:
-  - All types: title (required), description, tags
-  - snippet/command: content, language
-  - prompt/note: content
-  - link: URL (required)
-- `createItem` server action with Zod validation (auth-guarded, owner-scoped)
-- `createItem` query function in `lib/db/items.ts`
-- On success: notify, close the modal, and refresh the list
+<!-- Bullet points of what success looks like -->
 
 ## Notes
 
-- Spec source: `context/features/item-create-spec.md`
-- Content kind is derived from the type: snippet/prompt/command/note → `TEXT` (payload in `content`), link → `URL` (payload in `url`). Set `contentType` accordingly on create.
-- `language` only applies to snippet/command.
-- Tags follow the existing `updateItem` pattern (`connectOrCreate`, per-user scoped).
-- **Toast caveat:** the spec says "toast on success", but the codebase has intentionally avoided adding a toast library so far (auth forms use inline `role="alert"` messaging). Decide whether to add a toast lib (e.g. `sonner`) now or mirror the existing inline pattern — worth confirming before implementing.
-- Reuse the `updateItem` mutation/query shape as the template for `createItem` (Zod schema, owner scoping, refreshed return).
+<!-- Additional context, constraints, or details from spec -->
 
 ## History
 
@@ -62,3 +48,4 @@ In Progress
 **Item Drawer — Edit Mode** (2026-07-13) - Inline edit in the drawer: Edit (pencil) swaps view → edit (Save/Cancel) with no page change. Editable all types: title/description/tags; type-specific: content (TEXT), language (snippet/command), url (link). New `updateItem` action + query fn (Zod `updateItemSchema`, owner-scoped, tags via `set:[]`+`connectOrCreate`, returns refreshed `ItemDetail`); only fields in the payload are written. Added `ItemDrawerEditForm` + `Textarea`. 14 new tests, `npm test` 78 pass; `tsc`/`lint`/build pass.
 **Fix — App shell top bar fixed** (2026-07-13) - Shell grew with content (`min-h-svh`) so the top bar scrolled away. Capped to `h-svh`, clipped the inset, and made only the content `<main>` scroll in `AppShell.tsx`. Layout-only; build passes.
 **Refactor — Item mutations delegate to query layer** (2026-07-13) - Made the item server actions a uniform auth/validate/revalidate shell. `toggleFavorite`, `togglePin`, and `deleteItem` in [src/actions/items.ts](src/actions/items.ts) previously called Prisma directly, while `updateItem` already delegated to `lib/db` — an inconsistency. Added owner-scoped query fns to [src/lib/db/items.ts](src/lib/db/items.ts): `toggleItemFavorite`/`toggleItemPin` (read current flag → `updateMany` with owner-scoped `where` → return the new value, or `null` when not found/owned) and `deleteItem` (`deleteMany` → `boolean`). The three actions now delegate to these and no longer import `prisma`; the toggle actions check `next === null` (not falsy) so flipping a flag to `false` isn't misread as not-found. Pure internal reorg, no runtime/behavior change: the Prisma-level assertions moved from the action test into [src/lib/db/items.test.ts](src/lib/db/items.test.ts) (new coverage for all three fns) and the action tests now assert delegation against a mocked query layer. `npm test` 86 pass, `lint`/`tsc` clean; production build skipped (dev server running) — compile verified via `tsc --noEmit`. No DB migration.
+**Item Create** (2026-07-20) - New-item creation from a shadcn **Dialog** (Base UI) opened by the top-bar "New Item" button. Type selector for the five text/url system types (snippet, prompt, command, note, link; file/image excluded as Pro) with per-type conditional fields (all: title/description/tags; snippet/command: content+language; prompt/note: content; link: URL). New `createItem` action ([src/actions/items.ts](src/actions/items.ts), Zod `createItemSchema` — URL required for links) → owner-scoped `createItem` query fn ([src/lib/db/items.ts](src/lib/db/items.ts)) deriving `contentType` (link → `URL`, else `TEXT`) and tags via `connectOrCreate`; on success close + `router.refresh()` (inline errors, no toast lib). **Page ↔ dialog type sync** via `resolveCreatableType()`/`CREATABLE_SYSTEM_TYPES` in [item-types.ts](src/lib/item-types.ts): default from `/items/[type]`, and changing the selector navigates there. Colored type icons. **Tag autocomplete** ([TagInput.tsx](src/components/dashboard/TagInput.tsx)) suggesting existing tags via `GET /api/tags` → `searchTags()` ([src/lib/db/tags.ts](src/lib/db/tags.ts)). **Required-field UX** via native form constraints + `:user-invalid` on base [Input](src/components/ui/input.tsx)/[Textarea](src/components/ui/textarea.tsx) (red border only after blur/submit) + red asterisks; same pattern applied to [ItemDrawerEditForm](src/components/dashboard/ItemDrawerEditForm.tsx). Added shadcn `dialog`+`select`. 28 new tests (114 pass), `tsc`/lint clean; verified in-browser. Build skipped (dev server running) — verified via `tsc --noEmit`. No DB migration.
