@@ -1,10 +1,12 @@
-import { FolderPlus, Plus, Search } from "lucide-react";
+import { FolderPlus, Search } from "lucide-react";
 
+import { CreateItemDialog } from "@/components/dashboard/CreateItemDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 
-// Display-only top bar for the dashboard. Search and actions are not wired up yet.
+// Top bar for the dashboard. Search and "New collection" are not wired up yet;
+// "New item" opens the create-item dialog.
 export function TopBar() {
   return (
     <header className="flex h-16 shrink-0 items-center gap-4 border-b px-4">
@@ -25,10 +27,7 @@ export function TopBar() {
           <FolderPlus className="size-4" />
           New collection
         </Button>
-        <Button>
-          <Plus className="size-4" />
-          New item
-        </Button>
+        <CreateItemDialog />
       </div>
     </header>
   );

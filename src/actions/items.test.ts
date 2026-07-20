@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
+  createItem,
   deleteItem,
   toggleFavorite,
   togglePin,
@@ -17,11 +18,13 @@ const toggleItemFavorite = vi.fn();
 const toggleItemPin = vi.fn();
 const deleteItemQuery = vi.fn();
 const updateItemQuery = vi.fn();
+const createItemQuery = vi.fn();
 vi.mock("@/lib/db/items", () => ({
   toggleItemFavorite: (...args: unknown[]) => toggleItemFavorite(...args),
   toggleItemPin: (...args: unknown[]) => toggleItemPin(...args),
   deleteItem: (...args: unknown[]) => deleteItemQuery(...args),
   updateItem: (...args: unknown[]) => updateItemQuery(...args),
+  createItem: (...args: unknown[]) => createItemQuery(...args),
 }));
 
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
@@ -165,5 +168,53 @@ describe("updateItem", () => {
     });
     expect(res).toEqual({ success: false, error: "Must be a valid URL" });
     expect(updateItemQuery).not.toHaveBeenCalled();
+  });
+});
+
+describe("createItem", () => {
+  const validInput = { type: "snippet", title: "New snippet", tags: ["a"] };
+
+  it("rejects when not authenticated", async () => {
+    auth.mockResolvedValue(null);
+    const res = await createItem(validInput);
+    expect(res).toEqual({ success: false, error: "Not authenticated" });
+    expect(createItemQuery).not.toHaveBeenCalled();
+  });
+
+  it("returns the first Zod issue when validation fails", async () => {
+    const res = await createItem({ type: "snippet", title: "  ", tags: [] });
+    expect(res).toEqual({ success: false, error: "Title is required" });
+    expect(createItemQuery).not.toHaveBeenCalled();
+  });
+
+  it("requires a URL for link items before touching the query", async () => {
+    const res = await createItem({ type: "link", title: "Docs", tags: [] });
+    expect(res).toEqual({ success: false, error: "URL is required" });
+    expect(createItemQuery).not.toHaveBeenCalled();
+  });
+
+  it("returns an error when the query can't create the item", async () => {
+    createItemQuery.mockResolvedValue(null);
+    const res = await createItem(validInput);
+    expect(res).toEqual({ success: false, error: "Could not create item" });
+  });
+
+  it("passes the validated (normalized) data to the query and returns the item", async () => {
+    const detail = { id: "new-1", title: "New snippet" };
+    createItemQuery.mockResolvedValue(detail);
+
+    const res = await createItem({
+      type: "snippet",
+      title: "New snippet",
+      tags: ["a", " a ", "", "b"],
+    });
+
+    expect(res).toEqual({ success: true, item: detail });
+    expect(createItemQuery).toHaveBeenCalledWith("user-1", {
+      type: "snippet",
+      title: "New snippet",
+      // tags normalized by the schema: trimmed, de-duplicated, empties dropped.
+      tags: ["a", "b"],
+    });
   });
 });

@@ -56,10 +56,10 @@ export function ItemDrawerEditForm({
   const showLanguage =
     item.type.name === "snippet" || item.type.name === "command";
 
-  const titleEmpty = title.trim() === "";
-
-  function handleSave() {
-    if (titleEmpty) return;
+  // Native form constraint validation (the required title) gates submission and
+  // drives the red border via :user-invalid — no "touched"/"empty" bookkeeping.
+  function handleSave(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
     setError(null);
 
     // Only send the fields the item's type can hold; the query layer leaves any
@@ -84,14 +84,15 @@ export function ItemDrawerEditForm({
   }
 
   return (
-    <div className="flex flex-col gap-5 px-4 pb-6">
+    <form onSubmit={handleSave} className="flex flex-col gap-5 px-4 pb-6">
       {/* Save / Cancel bar — replaces the view-mode action bar. */}
       <div className="flex items-center gap-1.5">
-        <Button size="sm" onClick={handleSave} disabled={pending || titleEmpty}>
+        <Button type="submit" size="sm" disabled={pending}>
           <Save />
           {pending ? "Saving…" : "Save"}
         </Button>
         <Button
+          type="button"
           variant="outline"
           size="sm"
           onClick={onCancel}
@@ -118,7 +119,7 @@ export function ItemDrawerEditForm({
           id="edit-title"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
-          aria-invalid={titleEmpty}
+          required
           placeholder="Title"
         />
       </div>
@@ -188,6 +189,6 @@ export function ItemDrawerEditForm({
         />
         <p className="text-xs text-muted-foreground">Separate tags with commas.</p>
       </div>
-    </div>
+    </form>
   );
 }

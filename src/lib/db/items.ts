@@ -5,7 +5,7 @@
 import type { ContentType, Prisma } from "@/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
 import { SYSTEM_TYPE_ORDER } from "@/lib/item-types";
-import type { UpdateItemInput } from "@/lib/validations/items";
+import type { CreateItemInput, UpdateItemInput } from "@/lib/validations/items";
 
 // The item's type, resolved for the card's icon/border/label.
 export interface DashboardItemType {
@@ -183,6 +183,49 @@ export async function updateItem(
   await prisma.item.update({ where: { id }, data: updateData });
 
   return getItemDetail(userId, id);
+}
+
+// Create a new item for the given user from the New Item dialog payload. Resolves
+// the selected system type to its id, derives the storage `contentType` from it
+// (link → URL, every other creatable type → TEXT), and only persists the body
+// field that kind uses (`url` for link, `content` otherwise) plus `language` for
+// snippet/command. Tags are created-or-connected per user. Returns the created
+// ItemDetail, or null when the system type can't be resolved (shouldn't happen).
+export async function createItem(
+  userId: string,
+  data: CreateItemInput,
+): Promise<ItemDetail | null> {
+  const itemType = await prisma.itemType.findFirst({
+    where: { isSystem: true, name: data.type },
+    select: { id: true },
+  });
+  if (!itemType) return null;
+
+  const isLink = data.type === "link";
+  const contentType: ContentType = isLink ? "URL" : "TEXT";
+  const supportsLanguage = data.type === "snippet" || data.type === "command";
+
+  const created = await prisma.item.create({
+    data: {
+      title: data.title,
+      description: data.description ?? null,
+      contentType,
+      content: isLink ? null : (data.content ?? null),
+      url: isLink ? (data.url ?? null) : null,
+      language: supportsLanguage ? (data.language ?? null) : null,
+      user: { connect: { id: userId } },
+      itemType: { connect: { id: itemType.id } },
+      tags: {
+        connectOrCreate: data.tags.map((name) => ({
+          where: { name_userId: { name, userId } },
+          create: { name, user: { connect: { id: userId } } },
+        })),
+      },
+    },
+    select: { id: true },
+  });
+
+  return getItemDetail(userId, created.id);
 }
 
 // Flip an item's favorite flag, scoped to its owner. Returns the new value, or

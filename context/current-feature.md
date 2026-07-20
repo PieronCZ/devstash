@@ -1,16 +1,30 @@
-# Current Feature
+# Current Feature: Item Create
 
 ## Status
 
-Not Started
+In Progress
 
 ## Goals
 
-<!-- Bullet points of what success looks like -->
+- Add new items via a shadcn **Dialog** modal, opened from the "New Item" button in the top bar
+- Type selector for the five text/url system types: snippet, prompt, command, note, link (file/image are Pro, excluded)
+- Conditional fields by type:
+  - All types: title (required), description, tags
+  - snippet/command: content, language
+  - prompt/note: content
+  - link: URL (required)
+- `createItem` server action with Zod validation (auth-guarded, owner-scoped)
+- `createItem` query function in `lib/db/items.ts`
+- On success: notify, close the modal, and refresh the list
 
 ## Notes
 
-<!-- Additional context, constraints, or details from spec -->
+- Spec source: `context/features/item-create-spec.md`
+- Content kind is derived from the type: snippet/prompt/command/note → `TEXT` (payload in `content`), link → `URL` (payload in `url`). Set `contentType` accordingly on create.
+- `language` only applies to snippet/command.
+- Tags follow the existing `updateItem` pattern (`connectOrCreate`, per-user scoped).
+- **Toast caveat:** the spec says "toast on success", but the codebase has intentionally avoided adding a toast library so far (auth forms use inline `role="alert"` messaging). Decide whether to add a toast lib (e.g. `sonner`) now or mirror the existing inline pattern — worth confirming before implementing.
+- Reuse the `updateItem` mutation/query shape as the template for `createItem` (Zod schema, owner scoping, refreshed return).
 
 ## History
 
