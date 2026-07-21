@@ -5,6 +5,9 @@ import { Save, X } from "lucide-react";
 
 import type { ItemDetail } from "@/lib/db/items";
 import { updateItem } from "@/actions/items";
+import { CodeEditor } from "@/components/dashboard/CodeEditor";
+import { LanguageSelect } from "@/components/dashboard/LanguageSelect";
+import { defaultLanguageForType } from "@/lib/languages";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -48,13 +51,19 @@ export function ItemDrawerEditForm({
   const [description, setDescription] = useState(item.description ?? "");
   const [content, setContent] = useState(item.content ?? "");
   const [url, setUrl] = useState(item.url ?? "");
-  const [language, setLanguage] = useState(item.language ?? "");
+  // Default an unset command's language to bash (commands are shell scripts).
+  const [language, setLanguage] = useState(
+    item.language ?? defaultLanguageForType(item.type.name),
+  );
   const [tags, setTags] = useState(item.tags.join(", "));
 
   const showContent = item.contentType === "TEXT";
   const showUrl = item.contentType === "URL";
   const showLanguage =
     item.type.name === "snippet" || item.type.name === "command";
+  // Code types (snippet/command) edit content in the Monaco editor; other text
+  // types (prompt, note) keep the plain Textarea.
+  const isCode = showLanguage;
 
   // Native form constraint validation (the required title) gates submission and
   // drives the red border via :user-invalid — no "touched"/"empty" bookkeeping.
@@ -136,18 +145,28 @@ export function ItemDrawerEditForm({
         />
       </div>
 
-      {/* Content — text-kind items */}
+      {/* Content — text-kind items. Code types (snippet/command) use the Monaco
+          editor; other text types keep the plain Textarea. */}
       {showContent ? (
         <div className="flex flex-col gap-1.5">
           <FieldLabel htmlFor="edit-content">Content</FieldLabel>
-          <Textarea
-            id="edit-content"
-            value={content}
-            onChange={(e) => setContent(e.target.value)}
-            placeholder="Content"
-            rows={8}
-            className="font-mono text-xs"
-          />
+          {isCode ? (
+            <CodeEditor
+              value={content}
+              onChange={setContent}
+              language={language}
+              placeholder="Paste or write your code…"
+            />
+          ) : (
+            <Textarea
+              id="edit-content"
+              value={content}
+              onChange={(e) => setContent(e.target.value)}
+              placeholder="Content"
+              rows={8}
+              className="font-mono text-xs"
+            />
+          )}
         </div>
       ) : null}
 
@@ -155,11 +174,10 @@ export function ItemDrawerEditForm({
       {showLanguage ? (
         <div className="flex flex-col gap-1.5">
           <FieldLabel htmlFor="edit-language">Language</FieldLabel>
-          <Input
+          <LanguageSelect
             id="edit-language"
             value={language}
-            onChange={(e) => setLanguage(e.target.value)}
-            placeholder="e.g. typescript"
+            onChange={setLanguage}
           />
         </div>
       ) : null}

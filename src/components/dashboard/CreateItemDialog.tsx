@@ -18,7 +18,10 @@ import {
   resolveCreatableType,
   type CreatableSystemType,
 } from "@/lib/item-types";
+import { CodeEditor } from "@/components/dashboard/CodeEditor";
+import { LanguageSelect } from "@/components/dashboard/LanguageSelect";
 import { TagInput } from "@/components/dashboard/TagInput";
+import { defaultLanguageForType } from "@/lib/languages";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -105,20 +108,26 @@ export function CreateItemDialog() {
   const [description, setDescription] = useState("");
   const [content, setContent] = useState("");
   const [url, setUrl] = useState("");
-  const [language, setLanguage] = useState("");
+  const [language, setLanguage] = useState(
+    defaultLanguageForType(pageType ?? DEFAULT_TYPE),
+  );
   const [tags, setTags] = useState<string[]>([]);
 
   const showContent = type !== "link";
   const showUrl = type === "link";
   const showLanguage = type === "snippet" || type === "command";
+  // snippet & command are the code types — they get the Monaco editor; other
+  // text types (prompt, note) keep the plain Textarea.
+  const isCode = showLanguage;
 
   function resetForm() {
-    setType(pageType ?? DEFAULT_TYPE);
+    const initialType = pageType ?? DEFAULT_TYPE;
+    setType(initialType);
     setTitle("");
     setDescription("");
     setContent("");
     setUrl("");
-    setLanguage("");
+    setLanguage(defaultLanguageForType(initialType));
     setTags([]);
     setError(null);
   }
@@ -127,7 +136,9 @@ export function CreateItemDialog() {
     setOpen(next);
     if (next) {
       // Seed the type from the page we opened on (dashboard → first type).
-      setType(pageType ?? DEFAULT_TYPE);
+      const initialType = pageType ?? DEFAULT_TYPE;
+      setType(initialType);
+      setLanguage(defaultLanguageForType(initialType));
     } else {
       // Start each open from a clean slate.
       resetForm();
@@ -138,6 +149,8 @@ export function CreateItemDialog() {
   // dialog and the page in sync in both directions.
   function handleTypeChange(next: CreatableSystemType) {
     setType(next);
+    // Reset the language to the new type's default (command → bash, else unset).
+    setLanguage(defaultLanguageForType(next));
     if (next !== pageType) router.push(`/items/${next}`);
   }
 
@@ -267,18 +280,28 @@ export function CreateItemDialog() {
             />
           </div>
 
-          {/* Content — text-kind items */}
+          {/* Content — text-kind items. Code types (snippet/command) use the
+              Monaco editor; other text types keep the plain Textarea. */}
           {showContent ? (
             <div className="flex flex-col gap-1.5">
               <FieldLabel htmlFor="create-content">Content</FieldLabel>
-              <Textarea
-                id="create-content"
-                value={content}
-                onChange={(e) => setContent(e.target.value)}
-                placeholder="Content"
-                rows={8}
-                className="font-mono text-xs"
-              />
+              {isCode ? (
+                <CodeEditor
+                  value={content}
+                  onChange={setContent}
+                  language={language}
+                  placeholder="Paste or write your code…"
+                />
+              ) : (
+                <Textarea
+                  id="create-content"
+                  value={content}
+                  onChange={(e) => setContent(e.target.value)}
+                  placeholder="Content"
+                  rows={8}
+                  className="font-mono text-xs"
+                />
+              )}
             </div>
           ) : null}
 
@@ -286,11 +309,10 @@ export function CreateItemDialog() {
           {showLanguage ? (
             <div className="flex flex-col gap-1.5">
               <FieldLabel htmlFor="create-language">Language</FieldLabel>
-              <Input
+              <LanguageSelect
                 id="create-language"
                 value={language}
-                onChange={(e) => setLanguage(e.target.value)}
-                placeholder="e.g. typescript"
+                onChange={setLanguage}
               />
             </div>
           ) : null}
