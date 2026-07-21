@@ -16,6 +16,7 @@ import {
 
 import type { ItemDetail } from "@/lib/db/items";
 import { deleteItem, toggleFavorite, togglePin } from "@/actions/items";
+import { CodeEditor } from "@/components/dashboard/CodeEditor";
 import { ItemDrawerEditForm } from "@/components/dashboard/ItemDrawerEditForm";
 import { getTypeIcon } from "@/lib/icons";
 import { formatFileSize, relativeTime } from "@/lib/format";
@@ -103,7 +104,16 @@ function DetailBody({
     return <p className="text-sm text-muted-foreground italic">No content.</p>;
   }
 
-  // TEXT — bordered block with a header bar (language + copy), like the mock.
+  // Code types (snippet/command) render in the readonly Monaco editor, which
+  // brings its own macOS chrome, language label, and copy button.
+  if (item.type.name === "snippet" || item.type.name === "command") {
+    return (
+      <CodeEditor value={item.content} language={item.language ?? undefined} readOnly />
+    );
+  }
+
+  // Other text types (prompt, note) — bordered block with a header bar
+  // (language + copy), like the mock.
   return (
     <div className="overflow-hidden rounded-lg border bg-muted/40">
       <div className="flex items-center justify-between border-b bg-muted/60 px-3 py-1.5">

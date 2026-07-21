@@ -26,6 +26,11 @@ export default function RootLayout({
     <html
       lang="en"
       className={`dark ${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      // Browser extensions (LanguageTool, Grammarly, …) inject attributes like
+      // `data-lt-installed` onto <html> before React hydrates, which otherwise
+      // trips a hydration mismatch. This suppresses that one element's attribute
+      // diff only.
+      suppressHydrationWarning
     >
       <body className="min-h-full flex flex-col">{children}</body>
     </html>
