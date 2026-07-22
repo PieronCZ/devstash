@@ -17,6 +17,7 @@ import {
 import type { ItemDetail } from "@/lib/db/items";
 import { deleteItem, toggleFavorite, togglePin } from "@/actions/items";
 import { CodeEditor } from "@/components/dashboard/CodeEditor";
+import { MarkdownEditor } from "@/components/dashboard/MarkdownEditor";
 import { ItemDrawerEditForm } from "@/components/dashboard/ItemDrawerEditForm";
 import { getTypeIcon } from "@/lib/icons";
 import { formatFileSize, relativeTime } from "@/lib/format";
@@ -66,17 +67,10 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
   );
 }
 
-// The item's body, rendered by content kind. Type-specific editors (a real code
-// editor, image preview, etc.) come later — this is display only for now.
-function DetailBody({
-  item,
-  onCopy,
-  copied,
-}: {
-  item: ItemDetail;
-  onCopy: () => void;
-  copied: boolean;
-}) {
+// The item's body, rendered by content kind. Code types use the readonly Monaco
+// editor, note & prompt the readonly Markdown preview; both bring their own copy
+// button, so the outer action-bar Copy still covers link/file.
+function DetailBody({ item }: { item: ItemDetail }) {
   if (item.contentType === "FILE") {
     return (
       <p className="text-sm text-muted-foreground">
@@ -112,24 +106,9 @@ function DetailBody({
     );
   }
 
-  // Other text types (prompt, note) — bordered block with a header bar
-  // (language + copy), like the mock.
-  return (
-    <div className="overflow-hidden rounded-lg border bg-muted/40">
-      <div className="flex items-center justify-between border-b bg-muted/60 px-3 py-1.5">
-        <span className="font-mono text-xs text-muted-foreground">
-          {item.language ?? "text"}
-        </span>
-        <Button variant="ghost" size="xs" onClick={onCopy}>
-          {copied ? <Check className="text-emerald-500" /> : <Copy />}
-          Copy
-        </Button>
-      </div>
-      <pre className="overflow-x-auto p-3 font-mono text-xs leading-relaxed whitespace-pre">
-        {item.content}
-      </pre>
-    </div>
-  );
+  // Other text types (prompt, note) — rendered Markdown in the readonly editor,
+  // which brings its own dark chrome and copy button.
+  return <MarkdownEditor value={item.content} readOnly />;
 }
 
 function DrawerSkeleton() {
@@ -397,7 +376,7 @@ export function ItemDrawer({
               </div>
 
               {/* Content */}
-              <DetailBody item={item} onCopy={handleCopy} copied={copied} />
+              <DetailBody item={item} />
 
               {/* Tags */}
               {item.tags.length > 0 ? (
