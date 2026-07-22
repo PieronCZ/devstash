@@ -1,39 +1,16 @@
-# Current Feature: Markdown Editor
+# Current Feature
 
 ## Status
 
-In Progress
+Not Started
 
 ## Goals
 
-- Build a `MarkdownEditor` component with a tabbed Write/Preview interface
-- Use it for **note** and **prompt** content only (snippets/commands keep `CodeEditor`; links keep their URL field)
-- Render Markdown via `react-markdown` + `remark-gfm` (GitHub Flavored Markdown)
-- Match the existing dark theme chrome (`bg-[#1e1e1e]` container, `bg-[#2d2d2d]` header) with a copy button in the header (same style as `CodeEditor`)
-- Support both display (readonly) and edit modes:
-  - Readonly mode → only the Preview tab
-  - Edit mode → default to Write, Preview available
-- Fluid height capped at 400px, matching `CodeEditor` behavior
-- Style the preview via a dedicated `.markdown-preview` CSS class for reliable dark mode
+<!-- Bullet points of what success looks like -->
 
 ## Notes
 
-**Preview styling requirements:**
-- Headings (h1–h6) visually distinct — proper sizing/weight
-- Code blocks: dark background, monospace; inline code: subtle background highlight
-- Lists (ordered/unordered): proper indentation and bullets
-- Blockquotes: left-border accent
-- Links: blue with hover state
-- Tables: borders + header background
-
-**Integration points:**
-- `NewItemDialog` — note & prompt content field
-- `ItemDrawer` (edit mode) — note & prompt content field
-- `ItemDrawer` (view mode) — readonly preview for note & prompt content
-
-**New deps:** `react-markdown`, `remark-gfm`
-
-Source spec: `context/features/markdown-editor-spec.md`
+<!-- Additional context, constraints, or details from spec -->
 
 ## History
 
@@ -73,3 +50,4 @@ Source spec: `context/features/markdown-editor-spec.md`
 **Refactor — Item mutations delegate to query layer** (2026-07-13) - Made the item server actions a uniform auth/validate/revalidate shell. `toggleFavorite`, `togglePin`, and `deleteItem` in [src/actions/items.ts](src/actions/items.ts) previously called Prisma directly, while `updateItem` already delegated to `lib/db` — an inconsistency. Added owner-scoped query fns to [src/lib/db/items.ts](src/lib/db/items.ts): `toggleItemFavorite`/`toggleItemPin` (read current flag → `updateMany` with owner-scoped `where` → return the new value, or `null` when not found/owned) and `deleteItem` (`deleteMany` → `boolean`). The three actions now delegate to these and no longer import `prisma`; the toggle actions check `next === null` (not falsy) so flipping a flag to `false` isn't misread as not-found. Pure internal reorg, no runtime/behavior change: the Prisma-level assertions moved from the action test into [src/lib/db/items.test.ts](src/lib/db/items.test.ts) (new coverage for all three fns) and the action tests now assert delegation against a mocked query layer. `npm test` 86 pass, `lint`/`tsc` clean; production build skipped (dev server running) — compile verified via `tsc --noEmit`. No DB migration.
 **Item Create** (2026-07-20) - New-item creation from a shadcn **Dialog** (Base UI) opened by the top-bar "New Item" button. Type selector for the five text/url system types (snippet, prompt, command, note, link; file/image excluded as Pro) with per-type conditional fields (all: title/description/tags; snippet/command: content+language; prompt/note: content; link: URL). New `createItem` action ([src/actions/items.ts](src/actions/items.ts), Zod `createItemSchema` — URL required for links) → owner-scoped `createItem` query fn ([src/lib/db/items.ts](src/lib/db/items.ts)) deriving `contentType` (link → `URL`, else `TEXT`) and tags via `connectOrCreate`; on success close + `router.refresh()` (inline errors, no toast lib). **Page ↔ dialog type sync** via `resolveCreatableType()`/`CREATABLE_SYSTEM_TYPES` in [item-types.ts](src/lib/item-types.ts): default from `/items/[type]`, and changing the selector navigates there. Colored type icons. **Tag autocomplete** ([TagInput.tsx](src/components/dashboard/TagInput.tsx)) suggesting existing tags via `GET /api/tags` → `searchTags()` ([src/lib/db/tags.ts](src/lib/db/tags.ts)). **Required-field UX** via native form constraints + `:user-invalid` on base [Input](src/components/ui/input.tsx)/[Textarea](src/components/ui/textarea.tsx) (red border only after blur/submit) + red asterisks; same pattern applied to [ItemDrawerEditForm](src/components/dashboard/ItemDrawerEditForm.tsx). Added shadcn `dialog`+`select`. 28 new tests (114 pass), `tsc`/lint clean; verified in-browser. Build skipped (dev server running) — verified via `tsc --noEmit`. No DB migration.
 **Code Editor (Monaco)** (2026-07-21) - Monaco editor ([CodeEditor.tsx](src/components/dashboard/CodeEditor.tsx), `@monaco-editor/react`, dynamic `ssr:false`) for **snippet & command** content only; notes/prompts/links keep the `Textarea`. macOS-window chrome + header (language label + copy), readonly + edit modes, fluid height `[120,400]px` with themed scrollbar, always-dark theme. TS/JS worker diagnostics off (no false squiggles) + JSX enabled. Wired into the create dialog, drawer edit form, and drawer readonly display. New searchable [LanguageSelect](src/components/dashboard/LanguageSelect.tsx) with brand-colored `simple-icons` (luminance-guarded fallback) replacing the language input; **commands default to `bash`** via [languages.ts](src/lib/languages.ts) (+JSX/TSX). Also `suppressHydrationWarning` on `<html>` for extension-injected attrs. New deps: `@monaco-editor/react`, `simple-icons`. 7 new tests (121 pass), `tsc`/lint clean; verified in-browser. Build skipped (dev server running). No DB migration.
+**Markdown Editor** (2026-07-22) - Markdown editor ([MarkdownEditor.tsx](src/components/dashboard/MarkdownEditor.tsx), `react-markdown` + `remark-gfm`) for **note & prompt** content only; snippets/commands keep the Monaco `CodeEditor`, links keep their URL field. Write/Preview tabs + dark chrome matching `CodeEditor` (`bg-[#1e1e1e]`/`bg-[#2d2d2d]` header + copy button); readonly shows only Preview, edit defaults to Write. Auto-growing write textarea clamped `[120,400]px`; preview scrolls past 400px. Dedicated `.markdown-preview` class in [globals.css](src/app/globals.css) styles headings, code, GFM lists/tables, blockquotes, links (fixed dark colors). Wired into [CreateItemDialog](src/components/dashboard/CreateItemDialog.tsx), [ItemDrawerEditForm](src/components/dashboard/ItemDrawerEditForm.tsx), and [ItemDrawer](src/components/dashboard/ItemDrawer.tsx) readonly view (replaced the raw `<pre>`). New deps: `react-markdown`, `remark-gfm`. Component/CSS-only — no Vitest changes per policy; 121 tests still pass. `tsc`/lint clean; verified in-browser. Build skipped (dev running). No DB migration.
