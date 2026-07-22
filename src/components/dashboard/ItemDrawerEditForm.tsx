@@ -6,6 +6,7 @@ import { Save, X } from "lucide-react";
 import type { ItemDetail } from "@/lib/db/items";
 import { updateItem } from "@/actions/items";
 import { CodeEditor } from "@/components/dashboard/CodeEditor";
+import { MarkdownEditor } from "@/components/dashboard/MarkdownEditor";
 import { LanguageSelect } from "@/components/dashboard/LanguageSelect";
 import { defaultLanguageForType } from "@/lib/languages";
 import { Button } from "@/components/ui/button";
@@ -146,7 +147,7 @@ export function ItemDrawerEditForm({
       </div>
 
       {/* Content — text-kind items. Code types (snippet/command) use the Monaco
-          editor; other text types keep the plain Textarea. */}
+          editor; note & prompt use the Markdown editor. */}
       {showContent ? (
         <div className="flex flex-col gap-1.5">
           <FieldLabel htmlFor="edit-content">Content</FieldLabel>
@@ -158,13 +159,11 @@ export function ItemDrawerEditForm({
               placeholder="Paste or write your code…"
             />
           ) : (
-            <Textarea
+            <MarkdownEditor
               id="edit-content"
               value={content}
-              onChange={(e) => setContent(e.target.value)}
-              placeholder="Content"
-              rows={8}
-              className="font-mono text-xs"
+              onChange={setContent}
+              placeholder="Write Markdown…"
             />
           )}
         </div>

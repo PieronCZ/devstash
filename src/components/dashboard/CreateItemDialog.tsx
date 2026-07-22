@@ -19,6 +19,7 @@ import {
   type CreatableSystemType,
 } from "@/lib/item-types";
 import { CodeEditor } from "@/components/dashboard/CodeEditor";
+import { MarkdownEditor } from "@/components/dashboard/MarkdownEditor";
 import { LanguageSelect } from "@/components/dashboard/LanguageSelect";
 import { TagInput } from "@/components/dashboard/TagInput";
 import { defaultLanguageForType } from "@/lib/languages";
@@ -281,7 +282,7 @@ export function CreateItemDialog() {
           </div>
 
           {/* Content — text-kind items. Code types (snippet/command) use the
-              Monaco editor; other text types keep the plain Textarea. */}
+              Monaco editor; note & prompt use the Markdown editor. */}
           {showContent ? (
             <div className="flex flex-col gap-1.5">
               <FieldLabel htmlFor="create-content">Content</FieldLabel>
@@ -293,13 +294,11 @@ export function CreateItemDialog() {
                   placeholder="Paste or write your code…"
                 />
               ) : (
-                <Textarea
+                <MarkdownEditor
                   id="create-content"
                   value={content}
-                  onChange={(e) => setContent(e.target.value)}
-                  placeholder="Content"
-                  rows={8}
-                  className="font-mono text-xs"
+                  onChange={setContent}
+                  placeholder="Write Markdown…"
                 />
               )}
             </div>
