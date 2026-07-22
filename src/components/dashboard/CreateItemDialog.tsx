@@ -26,6 +26,7 @@ import { defaultLanguageForType } from "@/lib/languages";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
+  DialogBody,
   DialogClose,
   DialogContent,
   DialogDescription,
@@ -201,7 +202,11 @@ export function CreateItemDialog() {
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="flex flex-col gap-5">
+        <form
+          onSubmit={handleSubmit}
+          className="flex min-h-0 flex-1 flex-col"
+        >
+          <DialogBody className="flex flex-col gap-5">
           {error ? (
             <p
               role="alert"
@@ -347,6 +352,8 @@ export function CreateItemDialog() {
               type.
             </p>
           </div>
+          </DialogBody>
+
           <DialogFooter>
             <DialogClose
               render={
