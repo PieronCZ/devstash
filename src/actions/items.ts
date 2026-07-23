@@ -7,10 +7,12 @@ import type { ItemDetail } from "@/lib/db/items";
 import {
   createItem as createItemQuery,
   deleteItem as deleteItemQuery,
+  getItemFile,
   toggleItemFavorite as toggleItemFavoriteQuery,
   toggleItemPin as toggleItemPinQuery,
   updateItem as updateItemQuery,
 } from "@/lib/db/items";
+import { deleteFromR2, keyFromPublicUrl } from "@/lib/r2";
 import { createItemSchema, updateItemSchema } from "@/lib/validations/items";
 
 // Result shape shared by the item mutations — mirrors the project's
@@ -112,13 +114,30 @@ export async function updateItem(
 }
 
 // Permanently delete an item. The owner-scoped write lives in the query layer;
-// a non-owner (or missing item) deletes nothing and gets "not found".
+// a non-owner (or missing item) deletes nothing and gets "not found". For a
+// file-backed item we also remove the backing R2 object — best-effort, after the
+// DB row is gone: a failed cleanup leaves an orphaned object but never blocks the
+// delete the user asked for.
 export async function deleteItem(id: string): Promise<ActionResult> {
   const userId = await requireUserId();
   if (!userId) return { success: false, error: "Not authenticated" };
 
+  // Capture the backing file (if any) before the row is deleted.
+  const file = await getItemFile(userId, id);
+
   const deleted = await deleteItemQuery(userId, id);
   if (!deleted) return { success: false, error: "Item not found" };
+
+  if (file) {
+    const key = keyFromPublicUrl(file.fileUrl);
+    if (key) {
+      try {
+        await deleteFromR2(key);
+      } catch (error) {
+        console.error("Failed to delete R2 object for item", id, error);
+      }
+    }
+  }
 
   revalidateItemViews();
   return { success: true };

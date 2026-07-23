@@ -4,6 +4,8 @@ import { createElement, useState, useTransition } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import {
   Code,
+  File as FileIcon,
+  Image as ImageIcon,
   Link as LinkIcon,
   Plus,
   Sparkles,
@@ -15,14 +17,21 @@ import {
 import { createItem } from "@/actions/items";
 import {
   CREATABLE_SYSTEM_TYPES,
+  isUploadType,
+  PRO_TYPES,
   resolveCreatableType,
   type CreatableSystemType,
 } from "@/lib/item-types";
 import { CodeEditor } from "@/components/dashboard/CodeEditor";
 import { MarkdownEditor } from "@/components/dashboard/MarkdownEditor";
 import { LanguageSelect } from "@/components/dashboard/LanguageSelect";
+import {
+  FileUpload,
+  type UploadedFile,
+} from "@/components/dashboard/FileUpload";
 import { TagInput } from "@/components/dashboard/TagInput";
 import { defaultLanguageForType } from "@/lib/languages";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -56,6 +65,8 @@ const TYPE_META: Record<
   command: { label: "Command", icon: Terminal, color: "#f97316" },
   note: { label: "Note", icon: StickyNote, color: "#fde047" },
   link: { label: "Link", icon: LinkIcon, color: "#10b981" },
+  file: { label: "File", icon: FileIcon, color: "#6b7280" },
+  image: { label: "Image", icon: ImageIcon, color: "#ec4899" },
 };
 
 function FieldLabel({
@@ -114,10 +125,16 @@ export function CreateItemDialog() {
     defaultLanguageForType(pageType ?? DEFAULT_TYPE),
   );
   const [tags, setTags] = useState<string[]>([]);
+  const [uploaded, setUploaded] = useState<UploadedFile | null>(null);
+  const [uploading, setUploading] = useState(false);
 
-  const showContent = type !== "link";
+  const isUpload = isUploadType(type);
+  const showUpload = isUpload;
   const showUrl = type === "link";
   const showLanguage = type === "snippet" || type === "command";
+  // Text types (snippet, command, prompt, note) hold a body; link uses `url`,
+  // file/image use the upload — neither shows the content editor.
+  const showContent = !isUpload && !showUrl;
   // snippet & command are the code types — they get the Monaco editor; other
   // text types (prompt, note) keep the plain Textarea.
   const isCode = showLanguage;
@@ -131,6 +148,8 @@ export function CreateItemDialog() {
     setUrl("");
     setLanguage(defaultLanguageForType(initialType));
     setTags([]);
+    setUploaded(null);
+    setUploading(false);
     setError(null);
   }
 
@@ -153,6 +172,9 @@ export function CreateItemDialog() {
     setType(next);
     // Reset the language to the new type's default (command → bash, else unset).
     setLanguage(defaultLanguageForType(next));
+    // A file uploaded for one kind shouldn't carry to another type.
+    setUploaded(null);
+    setUploading(false);
     if (next !== pageType) router.push(`/items/${next}`);
   }
 
@@ -174,6 +196,17 @@ export function CreateItemDialog() {
     if (showContent) payload.content = content;
     if (showUrl) payload.url = url;
     if (showLanguage) payload.language = language;
+    if (showUpload) {
+      // The schema rejects a file/image item without a completed upload; guard
+      // here too so the user gets a clear message instead of a Zod error.
+      if (!uploaded) {
+        setError("Please upload a file first.");
+        return;
+      }
+      payload.fileUrl = uploaded.fileUrl;
+      payload.fileName = uploaded.fileName;
+      payload.fileSize = uploaded.fileSize;
+    }
 
     startTransition(async () => {
       const res = await createItem(payload);
@@ -198,7 +231,7 @@ export function CreateItemDialog() {
         <DialogHeader>
           <DialogTitle>New item</DialogTitle>
           <DialogDescription>
-            Stash a snippet, prompt, command, note, or link.
+            Stash a snippet, prompt, command, note, link, file, or image.
           </DialogDescription>
         </DialogHeader>
 
@@ -246,12 +279,21 @@ export function CreateItemDialog() {
                   const { label, icon, color } = TYPE_META[name];
                   return (
                     <SelectItem key={name} value={name}>
-                      <span className="flex items-center gap-2">
+                      <span className="flex flex-1 items-center gap-2">
                         {createElement(icon, {
                           className: "size-4",
                           style: { color },
                         })}
                         {label}
+                        {PRO_TYPES.has(name) ? (
+                          // Matches the sidebar's PRO badge (violet→pink gradient).
+                          <Badge
+                            variant="outline"
+                            className="ml-auto h-4 border-0 bg-[linear-gradient(to_right,#8b5cf6,#ec4899)] px-1.5 text-[10px] font-semibold tracking-wide text-white uppercase"
+                          >
+                            Pro
+                          </Badge>
+                        ) : null}
                       </span>
                     </SelectItem>
                   );
@@ -285,6 +327,21 @@ export function CreateItemDialog() {
               rows={2}
             />
           </div>
+
+          {/* Upload — file & image items */}
+          {showUpload ? (
+            <div className="flex flex-col gap-1.5">
+              <FieldLabel htmlFor="create-upload" required>
+                {type === "image" ? "Image" : "File"}
+              </FieldLabel>
+              <FileUpload
+                kind={type as "file" | "image"}
+                value={uploaded}
+                onChange={setUploaded}
+                onUploadingChange={setUploading}
+              />
+            </div>
+          ) : null}
 
           {/* Content — text-kind items. Code types (snippet/command) use the
               Monaco editor; note & prompt use the Markdown editor. */}
@@ -362,8 +419,8 @@ export function CreateItemDialog() {
             >
               Cancel
             </DialogClose>
-            <Button type="submit" disabled={pending}>
-              {pending ? "Creating…" : "Create item"}
+            <Button type="submit" disabled={pending || uploading}>
+              {pending ? "Creating…" : uploading ? "Uploading…" : "Create item"}
             </Button>
           </DialogFooter>
         </form>

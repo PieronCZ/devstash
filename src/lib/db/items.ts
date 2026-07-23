@@ -78,6 +78,7 @@ export interface ItemDetail {
   contentType: ContentType;
   content: string | null; // TEXT items
   url: string | null; // URL items
+  fileUrl: string | null; // R2 public URL, FILE items
   fileName: string | null; // FILE items
   fileSize: number | null; // bytes, FILE items
   language: string | null;
@@ -97,6 +98,7 @@ const itemDetailSelect = {
   contentType: true,
   content: true,
   url: true,
+  fileUrl: true,
   fileName: true,
   fileSize: true,
   language: true,
@@ -131,6 +133,7 @@ export async function getItemDetail(
     contentType: item.contentType,
     content: item.content,
     url: item.url,
+    fileUrl: item.fileUrl,
     fileName: item.fileName,
     fileSize: item.fileSize,
     language: item.language,
@@ -186,11 +189,13 @@ export async function updateItem(
 }
 
 // Create a new item for the given user from the New Item dialog payload. Resolves
-// the selected system type to its id, derives the storage `contentType` from it
-// (link → URL, every other creatable type → TEXT), and only persists the body
-// field that kind uses (`url` for link, `content` otherwise) plus `language` for
-// snippet/command. Tags are created-or-connected per user. Returns the created
-// ItemDetail, or null when the system type can't be resolved (shouldn't happen).
+// the selected system type to its id and derives the storage `contentType` from
+// it: link → URL (payload in `url`), file/image → FILE (payload in
+// `fileUrl`/`fileName`/`fileSize` from a completed upload), every other creatable
+// type → TEXT (payload in `content`, plus `language` for snippet/command). Only
+// the fields that kind uses are persisted. Tags are created-or-connected per
+// user. Returns the created ItemDetail, or null when the system type can't be
+// resolved (shouldn't happen).
 export async function createItem(
   userId: string,
   data: CreateItemInput,
@@ -202,7 +207,9 @@ export async function createItem(
   if (!itemType) return null;
 
   const isLink = data.type === "link";
-  const contentType: ContentType = isLink ? "URL" : "TEXT";
+  const isFile = data.type === "file" || data.type === "image";
+  const contentType: ContentType = isLink ? "URL" : isFile ? "FILE" : "TEXT";
+  const isText = !isLink && !isFile;
   const supportsLanguage = data.type === "snippet" || data.type === "command";
 
   const created = await prisma.item.create({
@@ -210,8 +217,11 @@ export async function createItem(
       title: data.title,
       description: data.description ?? null,
       contentType,
-      content: isLink ? null : (data.content ?? null),
+      content: isText ? (data.content ?? null) : null,
       url: isLink ? (data.url ?? null) : null,
+      fileUrl: isFile ? (data.fileUrl ?? null) : null,
+      fileName: isFile ? (data.fileName ?? null) : null,
+      fileSize: isFile ? (data.fileSize ?? null) : null,
       language: supportsLanguage ? (data.language ?? null) : null,
       user: { connect: { id: userId } },
       itemType: { connect: { id: itemType.id } },
@@ -226,6 +236,21 @@ export async function createItem(
   });
 
   return getItemDetail(userId, created.id);
+}
+
+// The backing-file fields for one item, scoped to its owner — for the download
+// proxy and delete cleanup. Returns null when the item doesn't exist, isn't owned
+// by `userId`, or isn't a file-backed item.
+export async function getItemFile(
+  userId: string,
+  id: string,
+): Promise<{ fileUrl: string; fileName: string | null } | null> {
+  const item = await prisma.item.findFirst({
+    where: { id, userId, contentType: "FILE" },
+    select: { fileUrl: true, fileName: true },
+  });
+  if (!item?.fileUrl) return null;
+  return { fileUrl: item.fileUrl, fileName: item.fileName };
 }
 
 // Flip an item's favorite flag, scoped to its owner. Returns the new value, or
