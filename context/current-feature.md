@@ -1,24 +1,16 @@
-# Current Feature: File List View
+# Current Feature
 
 ## Status
 
-In Progress
+Not Started
 
 ## Goals
 
-- Update `/items/files` to display as a single-column list (like Google Drive/Dropbox) instead of grid cards
-- Each row shows: file icon (by extension), file name, file size, upload date, download button
-- Row hover highlight
-- Click row opens ItemDrawer
-- Download button triggers direct download (stop propagation)
-- Responsive: stack info vertically on mobile
+<!-- Bullet points of what success looks like -->
 
 ## Notes
 
-- Only affects the `file` system type listing (`/items/files`), analogous to how `/items/images` renders `ImageCard` instead of `ItemCard`.
-- Mirror the Image Gallery View pattern: new list-row component, mapped in `items/[type]/page.tsx` for file-type items.
-- Download uses the existing owner-scoped `GET /api/items/[id]/download` endpoint.
-- File icon by extension derived from `fileName`.
+<!-- Additional context, constraints, or details from spec -->
 
 ## History
 
@@ -62,3 +54,4 @@ In Progress
 **Fix — Dialog scroll with fixed header/footer** (2026-07-22) - Long content in the create-item dialog (e.g. a lot of code in the content editor) on a short browser window pushed the dialog's top and bottom past the viewport with no scrollbar, leaving the title and Create action unreachable until the window was enlarged. Base [Dialog](src/components/ui/dialog.tsx) `DialogContent` is now a **flex column capped to the viewport** (`max-h-[calc(100svh-2rem)]`, `overflow-hidden`) instead of an uncapped grid; `DialogHeader`/`DialogFooter` are `shrink-0` (pinned top/bottom); new exported **`DialogBody`** wraps the scrollable middle (`-mx-4 min-h-0 flex-1 overflow-y-auto px-4` — breaks out so the scrollbar sits at the edge, re-adds padding to keep fields aligned). [CreateItemDialog](src/components/dashboard/CreateItemDialog.tsx)'s `<form>` now fills the content height (`flex min-h-0 flex-1 flex-col`) with its fields in `DialogBody` and the footer pinned below. [AlertDialog](src/components/ui/alert-dialog.tsx) got the same viewport cap (`max-h-[calc(100svh-2rem)] overflow-y-auto`) as a safety net so confirmations never overflow off-screen. Component/CSS-only — no Vitest changes per policy; 121 tests still pass. Verified in-browser via Playwright at a 1000×560 short viewport: header + footer stay visible, body scrolls (`scrollHeight 613 > clientHeight 387`, content capped at 528px), and scrolling reveals the lower Language/Tags fields while the footer stays pinned. `tsc`/lint clean. Build skipped (dev server running) — compile verified via `tsc --noEmit`. No DB migration.
 **File & Image Upload with Cloudflare R2** (2026-07-23) - Uploads for the file/image system types, stored in Cloudflare R2 (S3-compatible). New [r2.ts](src/lib/r2.ts) (S3-client boundary: `uploadToR2`/`deleteFromR2`/`getFromR2` + public-URL↔key helpers; objects under `uploads/<userId>/<uuid>.<ext>`, referenced by public URL in `Item.fileUrl`) and [upload.ts](src/lib/upload.ts) (pure per-kind rules — images 5 MB, files 10 MB — + `validateUpload`, shared client/server). `POST /api/upload` (auth, multipart, validate, put to R2, CORS-free per spec) and `GET /api/items/[id]/download` (owner-scoped streaming proxy, `Content-Disposition: attachment`). `deleteItem` also removes the backing R2 object (best-effort). [FileUpload](src/components/dashboard/FileUpload.tsx): drag-and-drop + XHR progress + preview/remove, wired into [CreateItemDialog](src/components/dashboard/CreateItemDialog.tsx) — file/image now creatable (open in dev) with PRO badges in the selector. [ItemDrawer](src/components/dashboard/ItemDrawer.tsx): image preview / file chip + Download button, widened to `sm:max-w-lg` with a `flex-wrap` action bar (no horizontal scroll). `createItemSchema`/`createItem` extended to `FILE`; `fileUrl` added to `ItemDetail` + new owner-scoped `getItemFile`; `UPLOAD_SYSTEM_TYPES`/`isUploadType` in [item-types.ts](src/lib/item-types.ts). New dep `@aws-sdk/client-s3`; R2 env vars documented in `.env.example`. 31 new tests (152 pass). Verified live via Playwright against real R2: image upload → preview + download `200 image/png` → delete removed the object; file (.txt) → chip + download `200 text/plain` → delete; demo data left clean. `tsc`/lint clean. Build skipped (dev running) — verified via `tsc --noEmit`. No DB migration (`Item` already had the file fields).
 **Image Gallery View** (2026-07-23) - The `/items/images` listing renders a thumbnail gallery instead of generic item cards. New [ImageCard](src/components/dashboard/ImageCard.tsx): a 16:9 (`aspect-video`) thumbnail — lazy plain `<img>` off the R2 public URL, `object-cover` fill, subtle `group-hover:scale-105` zoom (`duration-300`), placeholder icon when `fileUrl` is missing, pin/favorite over the top-right; opens the drawer like `ItemCard`. [items/[type]/page.tsx](src/app/items/[type]/page.tsx) maps image-type items through `ImageCard` (else `ItemCard`) in the existing `sm:grid-cols-2 lg:grid-cols-3` grid. Added `fileUrl` to [DashboardItem](src/lib/db/items.ts) (+ `itemSelect`/`toDashboardItem`) for the thumbnail source. UI-only — 152 tests still pass; `tsc`/lint clean. Build skipped (dev running). No DB migration.
+**File List View** (2026-07-23) - The `/items/files` listing renders a single-column list (Google Drive / Dropbox style) instead of the grid cards. New [FileRow](src/components/dashboard/FileRow.tsx): an extension-based file icon, the item title (+ the original `fileName` as a secondary line when it differs), file size, upload date, pin/favorite indicators, and a direct Download button (Base UI `Button` with `render` anchor to the existing owner-scoped `GET /api/items/[id]/download`; `onClick` stops propagation so it doesn't open the drawer). The row itself is a keyboard-accessible `role="button"` that opens the drawer; name/meta stack vertically on mobile (`flex-col sm:flex-row`), rows divided in a bordered container. [items/[type]/page.tsx](src/app/items/[type]/page.tsx) now branches: file types → `FileRow` list, image types → `ImageCard` grid, everything else → `ItemCard` grid. New pure utility [file-icons.ts](src/lib/file-icons.ts) (`fileExtension` + `getFileIcon`) mapping filename extensions (docs/sheets/archives/images/audio/video/code) to lucide icons, falling back to a generic `File`; handles dotfiles, multi-dot names, and paths. Extended [DashboardItem](src/lib/db/items.ts) (+ `itemSelect`/`toDashboardItem`) with `fileName`/`fileSize`/`createdAt`. 8 new tests (160 pass); `tsc`/lint clean. Build skipped (dev running) — verified via `tsc --noEmit`. No DB migration.
