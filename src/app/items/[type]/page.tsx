@@ -10,6 +10,7 @@ import {
 import { getTypeIcon } from "@/lib/icons";
 import { ItemCard } from "@/components/dashboard/ItemCard";
 import { ImageCard } from "@/components/dashboard/ImageCard";
+import { FileRow } from "@/components/dashboard/FileRow";
 
 export default async function ItemsByTypePage({
   params,
@@ -32,6 +33,7 @@ export default async function ItemsByTypePage({
 
   const Icon = getTypeIcon(itemType.icon);
   const isImageType = itemType.name === "image";
+  const isFileType = itemType.name === "file";
 
   return (
     <div className="space-y-8">
@@ -50,17 +52,26 @@ export default async function ItemsByTypePage({
       </div>
 
       {/* Items grid — responsive: 1 col mobile, 2 at sm, 3 at lg. Image types
-          render as a thumbnail gallery instead of the generic item card. */}
+          render as a thumbnail gallery, file types as a single-column list
+          (Drive/Dropbox style); everything else as the generic item card. */}
       {items.length > 0 ? (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {items.map((item) =>
-            isImageType ? (
-              <ImageCard key={item.id} item={item} />
-            ) : (
-              <ItemCard key={item.id} item={item} />
-            ),
-          )}
-        </div>
+        isFileType ? (
+          <div className="divide-y rounded-xl border">
+            {items.map((item) => (
+              <FileRow key={item.id} item={item} />
+            ))}
+          </div>
+        ) : (
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {items.map((item) =>
+              isImageType ? (
+                <ImageCard key={item.id} item={item} />
+              ) : (
+                <ItemCard key={item.id} item={item} />
+              ),
+            )}
+          </div>
+        )
       ) : (
         <div className="rounded-xl border border-dashed p-12 text-center">
           <p className="text-sm text-muted-foreground">
