@@ -1,16 +1,23 @@
-# Current Feature
+# Current Feature: Image Gallery View
 
 ## Status
 
-Not Started
+In Progress
 
 ## Goals
 
-<!-- Bullet points of what success looks like -->
+- Create an image thumbnail card to replace the regular `ItemCard` for image-type items
+- Display image-type items in a 3-column grid/gallery
+- Thumbnails use a 16:9 aspect ratio (`aspect-video`)
+- Images fill the card with `object-cover` (edges may crop)
+- Subtle hover zoom effect (5% scale, 300ms transition)
 
 ## Notes
 
-<!-- Additional context, constraints, or details from spec -->
+- Spec: `context/features/image-display-spec.md`
+- Scope: the `image` system item type (file-kind, `contentType = FILE`, `fileUrl` on R2)
+- Applies to the image listing at `/items/images` (and any image grid on the dashboard)
+- Component/UI work — no DB migration expected; per policy, no Vitest for pure UI
 
 ## History
 
