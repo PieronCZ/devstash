@@ -22,6 +22,7 @@ export interface DashboardItem {
   title: string;
   description: string | null;
   contentType: ContentType;
+  fileUrl: string | null; // R2 public URL, FILE items — used for image thumbnails
   tags: string[];
   isFavorite: boolean;
   isPinned: boolean;
@@ -35,6 +36,7 @@ const itemSelect = {
   title: true,
   description: true,
   contentType: true,
+  fileUrl: true,
   isFavorite: true,
   isPinned: true,
   updatedAt: true,
@@ -47,6 +49,7 @@ type ItemRow = {
   title: string;
   description: string | null;
   contentType: ContentType;
+  fileUrl: string | null;
   isFavorite: boolean;
   isPinned: boolean;
   updatedAt: Date;
@@ -60,6 +63,7 @@ function toDashboardItem(item: ItemRow): DashboardItem {
     title: item.title,
     description: item.description,
     contentType: item.contentType,
+    fileUrl: item.fileUrl,
     tags: item.tags.map((t) => t.name),
     isFavorite: item.isFavorite,
     isPinned: item.isPinned,
