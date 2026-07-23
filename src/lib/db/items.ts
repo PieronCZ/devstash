@@ -23,9 +23,12 @@ export interface DashboardItem {
   description: string | null;
   contentType: ContentType;
   fileUrl: string | null; // R2 public URL, FILE items — used for image thumbnails
+  fileName: string | null; // FILE items — original filename (extension → icon)
+  fileSize: number | null; // bytes, FILE items
   tags: string[];
   isFavorite: boolean;
   isPinned: boolean;
+  createdAt: string; // ISO — upload date for FILE items
   updatedAt: string; // ISO
   type: DashboardItemType;
 }
@@ -37,8 +40,11 @@ const itemSelect = {
   description: true,
   contentType: true,
   fileUrl: true,
+  fileName: true,
+  fileSize: true,
   isFavorite: true,
   isPinned: true,
+  createdAt: true,
   updatedAt: true,
   itemType: { select: { id: true, name: true, icon: true, color: true } },
   tags: { select: { name: true }, orderBy: { name: "asc" } },
@@ -50,8 +56,11 @@ type ItemRow = {
   description: string | null;
   contentType: ContentType;
   fileUrl: string | null;
+  fileName: string | null;
+  fileSize: number | null;
   isFavorite: boolean;
   isPinned: boolean;
+  createdAt: Date;
   updatedAt: Date;
   itemType: { id: string; name: string; icon: string; color: string };
   tags: { name: string }[];
@@ -64,9 +73,12 @@ function toDashboardItem(item: ItemRow): DashboardItem {
     description: item.description,
     contentType: item.contentType,
     fileUrl: item.fileUrl,
+    fileName: item.fileName,
+    fileSize: item.fileSize,
     tags: item.tags.map((t) => t.name),
     isFavorite: item.isFavorite,
     isPinned: item.isPinned,
+    createdAt: item.createdAt.toISOString(),
     updatedAt: item.updatedAt.toISOString(),
     type: item.itemType,
   };
