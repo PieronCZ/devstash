@@ -7,7 +7,9 @@ import {
   Check,
   Clock,
   Copy,
+  Download,
   ExternalLink,
+  FileText,
   Pencil,
   Pin,
   Star,
@@ -72,11 +74,38 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 // button, so the outer action-bar Copy still covers link/file.
 function DetailBody({ item }: { item: ItemDetail }) {
   if (item.contentType === "FILE") {
-    return (
-      <p className="text-sm text-muted-foreground">
+    const meta = (
+      <>
         {item.fileName ?? "Untitled file"}
         {item.fileSize != null ? ` · ${formatFileSize(item.fileSize)}` : ""}
-      </p>
+      </>
+    );
+
+    // Images: show a preview from the R2 public URL. Other files: a labelled
+    // file chip. Both fall back to the plain name·size line when no URL exists.
+    if (item.type.name === "image" && item.fileUrl) {
+      return (
+        <div className="flex flex-col gap-2">
+          {/* eslint-disable-next-line @next/next/no-img-element -- R2 public URL, not a static asset */}
+          <img
+            src={item.fileUrl}
+            alt={item.fileName ?? item.title}
+            className="max-h-80 w-full rounded-lg border object-contain"
+          />
+          <p className="text-xs text-muted-foreground">{meta}</p>
+        </div>
+      );
+    }
+
+    return (
+      <div className="flex items-center gap-3 rounded-lg border bg-muted/30 p-3">
+        <span className="flex size-10 shrink-0 items-center justify-center rounded-md border bg-background">
+          <FileText className="size-5 text-muted-foreground" />
+        </span>
+        <p className="min-w-0 flex-1 truncate text-sm text-muted-foreground">
+          {meta}
+        </p>
+      </div>
     );
   }
 
@@ -224,7 +253,7 @@ export function ItemDrawer({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-full gap-0 overflow-y-auto sm:max-w-md">
+      <SheetContent className="w-full gap-0 overflow-y-auto sm:max-w-lg">
         {loading || !item ? (
           error ? (
             <div className="p-8 text-center text-sm text-muted-foreground">
@@ -299,8 +328,9 @@ export function ItemDrawer({
                 ) : null}
               </div>
 
-              {/* Action bar */}
-              <div className="flex items-center gap-1.5">
+              {/* Action bar — wraps so the file/image row (with Download) never
+                  overflows the drawer width. */}
+              <div className="flex flex-wrap items-center gap-1.5">
                 <Button
                   variant="outline"
                   size="sm"
@@ -329,6 +359,23 @@ export function ItemDrawer({
                   {copied ? <Check className="text-emerald-500" /> : <Copy />}
                   Copy
                 </Button>
+                {item.contentType === "FILE" ? (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    nativeButton={false}
+                    render={
+                      <a
+                        href={`/api/items/${item.id}/download`}
+                        download={item.fileName ?? true}
+                        aria-label="Download file"
+                      />
+                    }
+                  >
+                    <Download />
+                    Download
+                  </Button>
+                ) : null}
 
                 <div className="ml-auto flex items-center gap-1.5">
                   <Button

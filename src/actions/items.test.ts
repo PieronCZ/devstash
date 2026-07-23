@@ -19,12 +19,22 @@ const toggleItemPin = vi.fn();
 const deleteItemQuery = vi.fn();
 const updateItemQuery = vi.fn();
 const createItemQuery = vi.fn();
+const getItemFile = vi.fn();
 vi.mock("@/lib/db/items", () => ({
   toggleItemFavorite: (...args: unknown[]) => toggleItemFavorite(...args),
   toggleItemPin: (...args: unknown[]) => toggleItemPin(...args),
   deleteItem: (...args: unknown[]) => deleteItemQuery(...args),
   updateItem: (...args: unknown[]) => updateItemQuery(...args),
   createItem: (...args: unknown[]) => createItemQuery(...args),
+  getItemFile: (...args: unknown[]) => getItemFile(...args),
+}));
+
+// R2 boundary — asserted for the file-cleanup path, otherwise inert.
+const deleteFromR2 = vi.fn();
+const keyFromPublicUrl = vi.fn();
+vi.mock("@/lib/r2", () => ({
+  deleteFromR2: (...args: unknown[]) => deleteFromR2(...args),
+  keyFromPublicUrl: (...args: unknown[]) => keyFromPublicUrl(...args),
 }));
 
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
@@ -32,6 +42,8 @@ vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 beforeEach(() => {
   vi.clearAllMocks();
   auth.mockResolvedValue({ user: { id: "user-1" } });
+  // Default: items have no backing file (text/url). File tests override this.
+  getItemFile.mockResolvedValue(null);
 });
 
 describe("toggleFavorite", () => {
@@ -118,6 +130,58 @@ describe("deleteItem", () => {
 
     expect(res).toEqual({ success: true });
     expect(deleteItemQuery).toHaveBeenCalledWith("user-1", "item-1");
+  });
+
+  it("does not touch R2 for a text/url item", async () => {
+    deleteItemQuery.mockResolvedValue(true);
+
+    await deleteItem("item-1");
+
+    expect(getItemFile).toHaveBeenCalledWith("user-1", "item-1");
+    expect(deleteFromR2).not.toHaveBeenCalled();
+  });
+
+  it("removes the backing R2 object for a file item", async () => {
+    getItemFile.mockResolvedValue({
+      fileUrl: "https://cdn.example.com/uploads/user-1/abc.pdf",
+      fileName: "abc.pdf",
+    });
+    keyFromPublicUrl.mockReturnValue("uploads/user-1/abc.pdf");
+    deleteItemQuery.mockResolvedValue(true);
+
+    const res = await deleteItem("item-1");
+
+    expect(res).toEqual({ success: true });
+    expect(deleteFromR2).toHaveBeenCalledWith("uploads/user-1/abc.pdf");
+  });
+
+  it("does not delete from R2 when nothing was removed from the DB", async () => {
+    getItemFile.mockResolvedValue({
+      fileUrl: "https://cdn.example.com/uploads/user-1/abc.pdf",
+      fileName: "abc.pdf",
+    });
+    deleteItemQuery.mockResolvedValue(false);
+
+    const res = await deleteItem("item-1");
+
+    expect(res).toEqual({ success: false, error: "Item not found" });
+    expect(deleteFromR2).not.toHaveBeenCalled();
+  });
+
+  it("still reports success when R2 cleanup fails (best-effort)", async () => {
+    getItemFile.mockResolvedValue({
+      fileUrl: "https://cdn.example.com/uploads/user-1/abc.pdf",
+      fileName: "abc.pdf",
+    });
+    keyFromPublicUrl.mockReturnValue("uploads/user-1/abc.pdf");
+    deleteItemQuery.mockResolvedValue(true);
+    deleteFromR2.mockRejectedValue(new Error("R2 down"));
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const res = await deleteItem("item-1");
+
+    expect(res).toEqual({ success: true });
+    errorSpy.mockRestore();
   });
 });
 

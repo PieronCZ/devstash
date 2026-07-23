@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  isUploadType,
   PRO_TYPES,
   resolveCreatableType,
   SYSTEM_TYPE_ORDER,
@@ -53,9 +54,9 @@ describe("resolveCreatableType", () => {
     expect(resolveCreatableType("Prompts")).toBe("prompt");
   });
 
-  it("returns null for the Pro-only file/image types", () => {
-    expect(resolveCreatableType("file")).toBeNull();
-    expect(resolveCreatableType("images")).toBeNull();
+  it("resolves the file/image upload types (singular and plural)", () => {
+    expect(resolveCreatableType("file")).toBe("file");
+    expect(resolveCreatableType("images")).toBe("image");
   });
 
   it("returns null for unknown params or nullish input", () => {
@@ -63,5 +64,18 @@ describe("resolveCreatableType", () => {
     expect(resolveCreatableType("")).toBeNull();
     expect(resolveCreatableType(null)).toBeNull();
     expect(resolveCreatableType(undefined)).toBeNull();
+  });
+});
+
+describe("isUploadType", () => {
+  it("is true for file and image", () => {
+    expect(isUploadType("file")).toBe(true);
+    expect(isUploadType("image")).toBe(true);
+  });
+
+  it("is false for text/url types", () => {
+    expect(isUploadType("snippet")).toBe(false);
+    expect(isUploadType("link")).toBe(false);
+    expect(isUploadType("note")).toBe(false);
   });
 });

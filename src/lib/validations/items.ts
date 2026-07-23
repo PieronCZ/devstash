@@ -29,11 +29,12 @@ export const updateItemSchema = z.object({
 export type UpdateItemInput = z.infer<typeof updateItemSchema>;
 
 // Payload for creating an item from the New Item dialog. `type` selects one of
-// the creatable system types (file/image excluded — those need an upload flow);
-// the storage `contentType` and which body field is used are derived from it.
-// Type-specific fields (content/url/language) are optional and only sent for the
-// relevant type. Only `title` is universally required; `url` is required for
-// link items (enforced below).
+// the creatable system types; the storage `contentType` and which body field is
+// used are derived from it (link → URL, file/image → FILE, else TEXT).
+// Type-specific fields (content/url/language + file meta) are optional and only
+// sent for the relevant type. Only `title` is universally required; `url` is
+// required for links and the file fields for file/image (enforced below). The
+// upload itself already happened (POST /api/upload); we persist its result here.
 export const createItemSchema = z
   .object({
     type: z.enum(CREATABLE_SYSTEM_TYPES),
@@ -49,6 +50,12 @@ export const createItemSchema = z
       )
       .optional(),
     language: z.preprocess(emptyToNull, z.string().trim().nullable()).optional(),
+    // File-backed items: the uploaded object's public URL + original metadata.
+    fileUrl: z
+      .preprocess(emptyToNull, z.string().trim().url().nullable())
+      .optional(),
+    fileName: z.preprocess(emptyToNull, z.string().nullable()).optional(),
+    fileSize: z.number().int().positive().nullable().optional(),
     tags: z
       .array(z.string())
       .transform((arr) => [...new Set(arr.map((t) => t.trim()).filter(Boolean))]),
@@ -61,6 +68,16 @@ export const createItemSchema = z
         path: ["url"],
         message: "URL is required",
       });
+    }
+    // File/image items need a completed upload.
+    if (data.type === "file" || data.type === "image") {
+      if (!data.fileUrl || !data.fileName || !data.fileSize) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["fileUrl"],
+          message: "A file upload is required",
+        });
+      }
     }
   });
 

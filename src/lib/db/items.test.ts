@@ -4,6 +4,7 @@ import {
   createItem,
   deleteItem,
   getItemDetail,
+  getItemFile,
   toggleItemFavorite,
   toggleItemPin,
 } from "@/lib/db/items";
@@ -57,6 +58,7 @@ describe("getItemDetail", () => {
       contentType: "TEXT",
       content: "export function useDebounce() {}",
       url: null,
+      fileUrl: null,
       fileName: null,
       fileSize: null,
       language: "typescript",
@@ -81,6 +83,7 @@ describe("getItemDetail", () => {
       contentType: "TEXT",
       content: "export function useDebounce() {}",
       url: null,
+      fileUrl: null,
       fileName: null,
       fileSize: null,
       language: "typescript",
@@ -102,6 +105,7 @@ describe("getItemDetail", () => {
       contentType: "TEXT",
       content: "jot",
       url: null,
+      fileUrl: null,
       fileName: null,
       fileSize: null,
       language: null,
@@ -340,5 +344,72 @@ describe("createItem", () => {
       expect.objectContaining({ where: { id: "new-1", userId: "user-1" } }),
     );
     expect(detail?.id).toBe("new-1");
+  });
+
+  it.each(["file", "image"] as const)(
+    "creates a %s as FILE with file meta set, content/url/language null",
+    async (type) => {
+      itemTypeFindFirst.mockResolvedValue({ id: "type-f" });
+      create.mockResolvedValue({ id: "new-f" });
+      findFirst.mockResolvedValue(detailRow);
+
+      await createItem("user-1", {
+        type,
+        title: "My upload",
+        fileUrl: "https://cdn.example.com/uploads/user-1/abc.png",
+        fileName: "abc.png",
+        fileSize: 1234,
+        tags: [],
+      });
+
+      expect(create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            contentType: "FILE",
+            fileUrl: "https://cdn.example.com/uploads/user-1/abc.png",
+            fileName: "abc.png",
+            fileSize: 1234,
+            content: null,
+            url: null,
+            language: null,
+          }),
+        }),
+      );
+    },
+  );
+});
+
+describe("getItemFile", () => {
+  it("scopes the lookup to the owner and FILE items", async () => {
+    findFirst.mockResolvedValue(null);
+
+    await getItemFile("user-1", "item-1");
+
+    expect(findFirst).toHaveBeenCalledWith({
+      where: { id: "item-1", userId: "user-1", contentType: "FILE" },
+      select: { fileUrl: true, fileName: true },
+    });
+  });
+
+  it("returns null when the item isn't found / not a file", async () => {
+    findFirst.mockResolvedValue(null);
+    expect(await getItemFile("user-1", "missing")).toBeNull();
+  });
+
+  it("returns null when a file row somehow has no fileUrl", async () => {
+    findFirst.mockResolvedValue({ fileUrl: null, fileName: "x.pdf" });
+    expect(await getItemFile("user-1", "item-1")).toBeNull();
+  });
+
+  it("returns the file url and name for a file item", async () => {
+    findFirst.mockResolvedValue({
+      fileUrl: "https://cdn.example.com/uploads/user-1/abc.pdf",
+      fileName: "abc.pdf",
+    });
+
+    expect(await getItemFile("user-1", "item-1")).toEqual({
+      fileUrl: "https://cdn.example.com/uploads/user-1/abc.pdf",
+      fileName: "abc.pdf",
+    });
   });
 });

@@ -103,7 +103,7 @@ describe("createItemSchema", () => {
 
   it("rejects an unknown type", () => {
     const res = createItemSchema.safeParse({
-      type: "file",
+      type: "video",
       title: "T",
       tags: [],
     });
@@ -182,5 +182,50 @@ describe("createItemSchema", () => {
       expect(res.data.content).toBeNull();
       expect(res.data.language).toBeNull();
     }
+  });
+
+  it.each(["file", "image"] as const)(
+    "requires a completed upload for %s items",
+    (type) => {
+      const res = createItemSchema.safeParse({ type, title: "T", tags: [] });
+      expect(res.success).toBe(false);
+      if (!res.success) {
+        expect(res.error.issues[0]?.message).toBe("A file upload is required");
+        expect(res.error.issues[0]?.path).toEqual(["fileUrl"]);
+      }
+    },
+  );
+
+  it.each(["file", "image"] as const)(
+    "accepts a %s item with a completed upload",
+    (type) => {
+      const res = createItemSchema.safeParse({
+        type,
+        title: "My upload",
+        fileUrl: "https://cdn.example.com/uploads/u1/abc.png",
+        fileName: "abc.png",
+        fileSize: 2048,
+        tags: [],
+      });
+      expect(res.success).toBe(true);
+      if (res.success) {
+        expect(res.data.fileUrl).toBe(
+          "https://cdn.example.com/uploads/u1/abc.png",
+        );
+        expect(res.data.fileName).toBe("abc.png");
+        expect(res.data.fileSize).toBe(2048);
+      }
+    },
+  );
+
+  it("rejects a file item whose upload is missing the size", () => {
+    const res = createItemSchema.safeParse({
+      type: "file",
+      title: "T",
+      fileUrl: "https://cdn.example.com/uploads/u1/abc.pdf",
+      fileName: "abc.pdf",
+      tags: [],
+    });
+    expect(res.success).toBe(false);
   });
 });
