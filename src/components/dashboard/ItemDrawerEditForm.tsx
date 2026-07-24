@@ -5,30 +5,14 @@ import { Save, X } from "lucide-react";
 
 import type { ItemDetail } from "@/lib/db/items";
 import { updateItem } from "@/actions/items";
-import { CodeEditor } from "@/components/dashboard/CodeEditor";
-import { MarkdownEditor } from "@/components/dashboard/MarkdownEditor";
 import { LanguageSelect } from "@/components/dashboard/LanguageSelect";
+import { Field } from "@/components/dashboard/Field";
+import { ItemContentEditor } from "@/components/dashboard/ItemContentEditor";
+import { typeSpecificPayload } from "@/lib/item-fields";
 import { defaultLanguageForType } from "@/lib/languages";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-
-function FieldLabel({
-  htmlFor,
-  children,
-}: {
-  htmlFor: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <label
-      htmlFor={htmlFor}
-      className="text-xs font-semibold tracking-wider text-muted-foreground uppercase"
-    >
-      {children}
-    </label>
-  );
-}
 
 interface ItemDrawerEditFormProps {
   item: ItemDetail;
@@ -63,7 +47,7 @@ export function ItemDrawerEditForm({
   const showLanguage =
     item.type.name === "snippet" || item.type.name === "command";
   // Code types (snippet/command) edit content in the Monaco editor; other text
-  // types (prompt, note) keep the plain Textarea.
+  // types (prompt, note) keep the Markdown editor.
   const isCode = showLanguage;
 
   // Native form constraint validation (the required title) gates submission and
@@ -78,10 +62,11 @@ export function ItemDrawerEditForm({
       title,
       description,
       tags: tags.split(","),
+      ...typeSpecificPayload(
+        { showContent, showUrl, showLanguage, isCode },
+        { content, url, language },
+      ),
     };
-    if (showContent) payload.content = content;
-    if (showUrl) payload.url = url;
-    if (showLanguage) payload.language = language;
 
     startTransition(async () => {
       const res = await updateItem(item.id, payload);
@@ -122,9 +107,7 @@ export function ItemDrawerEditForm({
         </p>
       ) : null}
 
-      {/* Title */}
-      <div className="flex flex-col gap-1.5">
-        <FieldLabel htmlFor="edit-title">Title</FieldLabel>
+      <Field label="Title" htmlFor="edit-title">
         <Input
           id="edit-title"
           value={title}
@@ -132,11 +115,9 @@ export function ItemDrawerEditForm({
           required
           placeholder="Title"
         />
-      </div>
+      </Field>
 
-      {/* Description */}
-      <div className="flex flex-col gap-1.5">
-        <FieldLabel htmlFor="edit-description">Description</FieldLabel>
+      <Field label="Description" htmlFor="edit-description">
         <Textarea
           id="edit-description"
           value={description}
@@ -144,47 +125,36 @@ export function ItemDrawerEditForm({
           placeholder="Optional description"
           rows={2}
         />
-      </div>
+      </Field>
 
       {/* Content — text-kind items. Code types (snippet/command) use the Monaco
           editor; note & prompt use the Markdown editor. */}
       {showContent ? (
-        <div className="flex flex-col gap-1.5">
-          <FieldLabel htmlFor="edit-content">Content</FieldLabel>
-          {isCode ? (
-            <CodeEditor
-              value={content}
-              onChange={setContent}
-              language={language}
-              placeholder="Paste or write your code…"
-            />
-          ) : (
-            <MarkdownEditor
-              id="edit-content"
-              value={content}
-              onChange={setContent}
-              placeholder="Write Markdown…"
-            />
-          )}
-        </div>
+        <Field label="Content" htmlFor="edit-content">
+          <ItemContentEditor
+            isCode={isCode}
+            value={content}
+            onChange={setContent}
+            language={language}
+            markdownId="edit-content"
+          />
+        </Field>
       ) : null}
 
       {/* Language — snippet & command only */}
       {showLanguage ? (
-        <div className="flex flex-col gap-1.5">
-          <FieldLabel htmlFor="edit-language">Language</FieldLabel>
+        <Field label="Language" htmlFor="edit-language">
           <LanguageSelect
             id="edit-language"
             value={language}
             onChange={setLanguage}
           />
-        </div>
+        </Field>
       ) : null}
 
       {/* URL — link items */}
       {showUrl ? (
-        <div className="flex flex-col gap-1.5">
-          <FieldLabel htmlFor="edit-url">URL</FieldLabel>
+        <Field label="URL" htmlFor="edit-url">
           <Input
             id="edit-url"
             type="url"
@@ -192,12 +162,10 @@ export function ItemDrawerEditForm({
             onChange={(e) => setUrl(e.target.value)}
             placeholder="https://…"
           />
-        </div>
+        </Field>
       ) : null}
 
-      {/* Tags */}
-      <div className="flex flex-col gap-1.5">
-        <FieldLabel htmlFor="edit-tags">Tags</FieldLabel>
+      <Field label="Tags" htmlFor="edit-tags">
         <Input
           id="edit-tags"
           value={tags}
@@ -205,7 +173,7 @@ export function ItemDrawerEditForm({
           placeholder="Comma-separated, e.g. react, hooks"
         />
         <p className="text-xs text-muted-foreground">Separate tags with commas.</p>
-      </div>
+      </Field>
     </form>
   );
 }

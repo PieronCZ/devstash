@@ -3,19 +3,14 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { signOut } from "next-auth/react";
 import {
   Boxes,
   ChevronRight,
-  ChevronsUpDown,
   Circle,
   Clock,
-  LoaderCircle,
-  LogOut,
   Plus,
   Sparkles,
   Star,
-  User,
 } from "lucide-react";
 
 import type { SidebarItemType } from "@/lib/db/items";
@@ -23,31 +18,17 @@ import type { SidebarCollection } from "@/lib/db/collections";
 import { PRO_TYPES } from "@/lib/item-types";
 import { getTypeIcon } from "@/lib/icons";
 import { cn } from "@/lib/utils";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { UserAvatar } from "@/components/ui/user-avatar";
+import { ProBadge } from "@/components/dashboard/ProBadge";
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+  SidebarUserMenu,
+  type SidebarUser,
+} from "@/components/dashboard/SidebarUserMenu";
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import {
   Sidebar,
   SidebarContent,
@@ -63,19 +44,14 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
 
+export type { SidebarUser };
+
 // Primary navigation shown above the type list.
 const mainNav = [
   { title: "All items", href: "/dashboard", icon: Boxes },
   { title: "Favorites", href: "/favorites", icon: Star },
   { title: "Recent", href: "/recent", icon: Clock },
 ];
-
-export interface SidebarUser {
-  name: string | null;
-  email: string | null;
-  image: string | null;
-  isPro: boolean;
-}
 
 interface AppSidebarProps {
   itemTypes: SidebarItemType[];
@@ -89,8 +65,6 @@ interface AppSidebarProps {
 export function AppSidebar({ itemTypes, collections, user }: AppSidebarProps) {
   const pathname = usePathname();
   const [collectionsOpen, setCollectionsOpen] = useState(true);
-  const [signOutOpen, setSignOutOpen] = useState(false);
-  const [signingOut, setSigningOut] = useState(false);
 
   const isActive = (href: string) =>
     href === "/dashboard" ? pathname === href : pathname.startsWith(href);
@@ -177,14 +151,8 @@ export function AppSidebar({ itemTypes, collections, user }: AppSidebarProps) {
                       <Icon style={{ color: type.color }} />
                       <span className="capitalize">{type.name}</span>
                       {PRO_TYPES.has(type.name) ? (
-                        // `outline` variant so no bg-color sits under the gradient;
                         // `mr-7` reserves room for the count badge (absolute right-1).
-                        <Badge
-                          variant="outline"
-                          className="ml-auto mr-7 h-4 border-0 bg-[linear-gradient(to_right,#8b5cf6,#ec4899)] px-1.5 text-[10px] font-semibold tracking-wide text-white uppercase group-data-[collapsible=icon]:hidden"
-                        >
-                          Pro
-                        </Badge>
+                        <ProBadge className="ml-auto mr-7 group-data-[collapsible=icon]:hidden" />
                       ) : null}
                     </SidebarMenuButton>
                     <SidebarMenuBadge className="text-sidebar-foreground/45">
@@ -283,79 +251,7 @@ export function AppSidebar({ itemTypes, collections, user }: AppSidebarProps) {
           </div>
         ) : null}
 
-        <SidebarMenu>
-          <SidebarMenuItem>
-            {/* The whole user card is the account-menu trigger. */}
-            <DropdownMenu>
-              <DropdownMenuTrigger
-                render={<SidebarMenuButton size="lg" className="cursor-pointer" />}
-              >
-                <UserAvatar
-                  name={user.name}
-                  image={user.image}
-                  className="size-7 text-[10px]"
-                />
-                <span className="flex min-w-0 flex-col text-left leading-tight">
-                  <span className="truncate text-sm font-medium text-sidebar-accent-foreground">
-                    {user.name ?? "Your account"}
-                  </span>
-                  <span className="truncate text-xs text-sidebar-foreground/60">
-                    {user.email}
-                  </span>
-                </span>
-                <ChevronsUpDown className="ml-auto size-4 text-sidebar-foreground/60" />
-              </DropdownMenuTrigger>
-              <DropdownMenuContent side="top" align="end" className="w-56">
-                <DropdownMenuItem
-                  className="cursor-pointer"
-                  render={<Link href="/profile" />}
-                >
-                  <User />
-                  Profile
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  variant="destructive"
-                  className="cursor-pointer"
-                  onClick={() => setSignOutOpen(true)}
-                >
-                  <LogOut />
-                  Sign out
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-
-            <AlertDialog open={signOutOpen} onOpenChange={setSignOutOpen}>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Sign out?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    You&apos;ll need to sign in again to get back to your stash.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel className="cursor-pointer" disabled={signingOut}>
-                    Cancel
-                  </AlertDialogCancel>
-                  <AlertDialogAction
-                    variant="destructive"
-                    className="cursor-pointer"
-                    disabled={signingOut}
-                    onClick={(e) => {
-                      // Keep the dialog open (with a spinner) through the redirect.
-                      e.preventDefault();
-                      setSigningOut(true);
-                      signOut({ callbackUrl: "/sign-in" });
-                    }}
-                  >
-                    {signingOut ? <LoaderCircle className="animate-spin" /> : null}
-                    Sign out
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-          </SidebarMenuItem>
-        </SidebarMenu>
+        <SidebarUserMenu user={user} />
       </SidebarFooter>
     </Sidebar>
   );
