@@ -17,6 +17,22 @@ export const SYSTEM_TYPE_ORDER: readonly string[] = [
 // System item types gated behind a Pro plan — flagged with a PRO badge in the UI.
 export const PRO_TYPES: ReadonlySet<string> = new Set(["file", "image"]);
 
+// Sort named items by the canonical system-type order: known types first (in
+// SYSTEM_TYPE_ORDER order), unknown types appended after in name order. Returns a
+// new array (does not mutate the input). Pure/client-safe.
+export function sortBySystemTypeOrder<T extends { name: string }>(
+  items: readonly T[],
+): T[] {
+  return [...items].sort((a, b) => {
+    const ai = SYSTEM_TYPE_ORDER.indexOf(a.name);
+    const bi = SYSTEM_TYPE_ORDER.indexOf(b.name);
+    if (ai !== -1 && bi !== -1) return ai - bi;
+    if (ai !== -1) return -1;
+    if (bi !== -1) return 1;
+    return a.name.localeCompare(b.name);
+  });
+}
+
 // System types a user can create through the New Item dialog. file/image are
 // file-backed (they use the upload flow instead of a text/url body). Order
 // matches the dialog's type selector.
