@@ -1,3 +1,4 @@
+import { cache } from "react";
 import NextAuth, { CredentialsSignin } from "next-auth";
 import GitHub from "next-auth/providers/github";
 import Credentials from "next-auth/providers/credentials";
@@ -35,7 +36,7 @@ class RateLimitError extends CredentialsSignin {
 // of the edge-safe providers from auth.config.ts, and swaps the placeholder
 // Credentials provider for one with real bcrypt/DB-backed validation (this
 // module runs on the Node runtime, so bcryptjs and Prisma are available).
-export const { handlers, auth, signIn, signOut } = NextAuth({
+export const { handlers, auth: uncachedAuth, signIn, signOut } = NextAuth({
   ...authConfig,
   adapter: PrismaAdapter(prisma),
   session: { strategy: "jwt" },
@@ -118,3 +119,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     },
   },
 });
+
+// Dedupe auth() within a single request. NextAuth v5 beta's RSC `auth()` isn't
+// request-cached, and the `jwt` callback above hits the DB on every call — so a
+// layout and its nested page each calling `auth()` meant two JWT-decode + DB
+// round trips per render. React's cache() collapses repeated no-arg calls in the
+// same request to one. All call sites use `await auth()` (no args), so this is safe.
+export const auth = cache(uncachedAuth);

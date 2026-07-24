@@ -2,7 +2,7 @@
 // the authenticated user. Reads directly from the database via Prisma.
 
 import { prisma } from "@/lib/prisma";
-import { SYSTEM_TYPE_ORDER } from "@/lib/item-types";
+import { sortBySystemTypeOrder } from "@/lib/item-types";
 
 // One row of the item-type breakdown shown on the profile page.
 export interface ProfileTypeStat {
@@ -37,22 +37,15 @@ export async function getProfileStats(userId: string): Promise<ProfileStats> {
     }),
   ]);
 
-  const byType = types
-    .map((type) => ({
+  const byType = sortBySystemTypeOrder(
+    types.map((type) => ({
       id: type.id,
       name: type.name,
       icon: type.icon,
       color: type.color,
       count: type._count.items,
-    }))
-    .sort((a, b) => {
-      const ai = SYSTEM_TYPE_ORDER.indexOf(a.name);
-      const bi = SYSTEM_TYPE_ORDER.indexOf(b.name);
-      if (ai !== -1 && bi !== -1) return ai - bi;
-      if (ai !== -1) return -1;
-      if (bi !== -1) return 1;
-      return a.name.localeCompare(b.name);
-    });
+    })),
+  );
 
   return { totalItems, totalCollections, byType };
 }

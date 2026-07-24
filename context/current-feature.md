@@ -2,11 +2,17 @@
 
 ## Status
 
-Not Started
+In Progress
 
 ## Goals
 
-<!-- Bullet points of what success looks like -->
+Low/no-risk quick wins surfaced by the `code-scanner` audit:
+
+- **Perf:** `auth()` is called multiple times per authenticated request (layout + page), and its `jwt` callback hits the DB each time. Wrap the exported `auth` in React `cache()` so calls dedupe within a request.
+- **Refactor:** Extract the duplicated `SYSTEM_TYPE_ORDER`-based sort comparator (in `getSidebarItemTypes` and `getProfileStats`) into a shared `sortBySystemTypeOrder()` in `item-types.ts`.
+- **Refactor + perf:** Extract the duplicated "tally item types per collection, rank by usage" loop (in `getRecentCollections` and `getSidebarCollections`) into a shared `rankItemTypesByUsage()`, and bound `getSidebarCollections` so it only fetches what it renders (all favorites + 4 recent) instead of every collection.
+
+Out of scope (deferred, higher risk): file-upload provenance validation, the full `groupBy` DB-aggregate rewrite, and the large component splits (ItemDrawer/CreateItemDialog/AppSidebar).
 
 ## Notes
 

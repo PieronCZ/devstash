@@ -4,6 +4,7 @@ import {
   isUploadType,
   PRO_TYPES,
   resolveCreatableType,
+  sortBySystemTypeOrder,
   SYSTEM_TYPE_ORDER,
 } from "@/lib/item-types";
 
@@ -64,6 +65,56 @@ describe("resolveCreatableType", () => {
     expect(resolveCreatableType("")).toBeNull();
     expect(resolveCreatableType(null)).toBeNull();
     expect(resolveCreatableType(undefined)).toBeNull();
+  });
+});
+
+describe("sortBySystemTypeOrder", () => {
+  it("orders known system types by the canonical order", () => {
+    const input = [
+      { name: "link" },
+      { name: "snippet" },
+      { name: "note" },
+      { name: "prompt" },
+    ];
+    expect(sortBySystemTypeOrder(input).map((t) => t.name)).toEqual([
+      "snippet",
+      "prompt",
+      "note",
+      "link",
+    ]);
+  });
+
+  it("appends unknown types after known ones, in name order", () => {
+    const input = [
+      { name: "zeta" },
+      { name: "note" },
+      { name: "alpha" },
+      { name: "snippet" },
+    ];
+    expect(sortBySystemTypeOrder(input).map((t) => t.name)).toEqual([
+      "snippet",
+      "note",
+      "alpha",
+      "zeta",
+    ]);
+  });
+
+  it("does not mutate the input array", () => {
+    const input = [{ name: "note" }, { name: "snippet" }];
+    const copy = [...input];
+    sortBySystemTypeOrder(input);
+    expect(input).toEqual(copy);
+  });
+
+  it("preserves the objects (not just names)", () => {
+    const input = [
+      { name: "link", count: 3 },
+      { name: "snippet", count: 7 },
+    ];
+    expect(sortBySystemTypeOrder(input)).toEqual([
+      { name: "snippet", count: 7 },
+      { name: "link", count: 3 },
+    ]);
   });
 });
 

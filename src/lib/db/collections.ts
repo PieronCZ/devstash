@@ -23,6 +23,27 @@ export interface DashboardCollection {
   types: CollectionType[]; // distinct types, most-used first
 }
 
+// Rank the distinct item types across a collection's items by usage, most-used
+// first. Each element wraps an `itemType` (via the ItemCollection join's `item`);
+// returns the deduped itemType objects in descending count order.
+export function rankItemTypesByUsage<T extends { id: string }>(
+  items: readonly { item: { itemType: T } }[],
+): T[] {
+  const counts = new Map<string, { type: T; count: number }>();
+  for (const { item } of items) {
+    const t = item.itemType;
+    const entry = counts.get(t.id);
+    if (entry) {
+      entry.count += 1;
+    } else {
+      counts.set(t.id, { type: t, count: 1 });
+    }
+  }
+  return [...counts.values()]
+    .sort((a, b) => b.count - a.count)
+    .map((r) => r.type);
+}
+
 // Recent collections for the given user, newest first, with the data the
 // card needs: item count, distinct types, and the accent color derived from
 // the most-used item type in each collection.
@@ -47,26 +68,11 @@ export async function getRecentCollections(
   });
 
   return collections.map((collection) => {
-    // Tally usage per item type across the collection's items.
-    const counts = new Map<string, { type: CollectionType; count: number }>();
-    for (const { item } of collection.items) {
-      const t = item.itemType;
-      const entry = counts.get(t.id);
-      if (entry) {
-        entry.count += 1;
-      } else {
-        counts.set(t.id, {
-          type: { id: t.id, icon: t.icon, color: t.color },
-          count: 1,
-        });
-      }
-    }
-
-    // Most-used first. Fall back to the default type for empty collections.
-    const ranked = [...counts.values()].sort((a, b) => b.count - a.count);
+    // Most-used type first. Fall back to the default type for empty collections.
+    const ranked = rankItemTypesByUsage(collection.items);
     const types: CollectionType[] =
       ranked.length > 0
-        ? ranked.map((r) => r.type)
+        ? ranked
         : collection.defaultType
           ? [collection.defaultType]
           : [];
@@ -99,33 +105,42 @@ export async function getSidebarCollections(userId: string): Promise<{
   favorites: SidebarCollection[];
   recent: SidebarCollection[];
 }> {
-  const collections = await prisma.collection.findMany({
-    where: { userId },
-    orderBy: { updatedAt: "desc" },
-    include: {
-      defaultType: { select: { color: true } },
-      items: {
-        select: {
-          item: { select: { itemType: { select: { id: true, color: true } } } },
+  // Only fetch what the sidebar renders: every favorite, plus the 4 most
+  // recently updated collections — instead of loading every collection and
+  // discarding all but these.
+  const [favoriteRows, recentRows] = await Promise.all([
+    prisma.collection.findMany({
+      where: { userId, isFavorite: true },
+      orderBy: { updatedAt: "desc" },
+      include: {
+        defaultType: { select: { color: true } },
+        items: {
+          select: {
+            item: { select: { itemType: { select: { id: true, color: true } } } },
+          },
         },
       },
-    },
-  });
+    }),
+    prisma.collection.findMany({
+      where: { userId },
+      orderBy: { updatedAt: "desc" },
+      take: 4,
+      include: {
+        defaultType: { select: { color: true } },
+        items: {
+          select: {
+            item: { select: { itemType: { select: { id: true, color: true } } } },
+          },
+        },
+      },
+    }),
+  ]);
 
-  const mapped: SidebarCollection[] = collections.map((collection) => {
-    // Tally usage per item type to find the most-used one's color.
-    const counts = new Map<string, { color: string; count: number }>();
-    for (const { item } of collection.items) {
-      const t = item.itemType;
-      const entry = counts.get(t.id);
-      if (entry) {
-        entry.count += 1;
-      } else {
-        counts.set(t.id, { color: t.color, count: 1 });
-      }
-    }
-    const ranked = [...counts.values()].sort((a, b) => b.count - a.count);
-
+  const toSidebar = (
+    collection: (typeof recentRows)[number],
+  ): SidebarCollection => {
+    // Most-used type's color drives the recent dot; fall back to the default type.
+    const ranked = rankItemTypesByUsage(collection.items);
     return {
       id: collection.id,
       name: collection.name,
@@ -133,10 +148,10 @@ export async function getSidebarCollections(userId: string): Promise<{
       accentColor:
         ranked[0]?.color ?? collection.defaultType?.color ?? "currentColor",
     };
-  });
+  };
 
   return {
-    favorites: mapped.filter((c) => c.isFavorite),
-    recent: mapped.slice(0, 4), // already sorted newest-first
+    favorites: favoriteRows.map(toSidebar),
+    recent: recentRows.map(toSidebar),
   };
 }

@@ -4,7 +4,7 @@
 
 import type { ContentType, Prisma } from "@/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
-import { SYSTEM_TYPE_ORDER } from "@/lib/item-types";
+import { SYSTEM_TYPE_ORDER, sortBySystemTypeOrder } from "@/lib/item-types";
 import type { CreateItemInput, UpdateItemInput } from "@/lib/validations/items";
 
 // The item's type, resolved for the card's icon/border/label.
@@ -428,20 +428,13 @@ export async function getSidebarItemTypes(
     },
   });
 
-  return types
-    .map((type) => ({
+  return sortBySystemTypeOrder(
+    types.map((type) => ({
       id: type.id,
       name: type.name,
       icon: type.icon,
       color: type.color,
       count: type._count.items,
-    }))
-    .sort((a, b) => {
-      const ai = SYSTEM_TYPE_ORDER.indexOf(a.name);
-      const bi = SYSTEM_TYPE_ORDER.indexOf(b.name);
-      if (ai !== -1 && bi !== -1) return ai - bi;
-      if (ai !== -1) return -1;
-      if (bi !== -1) return 1;
-      return a.name.localeCompare(b.name);
-    });
+    })),
+  );
 }
