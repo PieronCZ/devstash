@@ -2,11 +2,18 @@
 
 ## Status
 
-Not Started
+In Progress
 
 ## Goals
 
-<!-- Bullet points of what success looks like -->
+Componentization / de-duplication pass surfaced by the large-block audit. No behavior change — pure refactor.
+
+- **#1 Shared `FieldLabel` + `Field` wrapper:** the uppercase field-label component is redeclared in `CreateItemDialog` and `ItemDrawerEditForm`; both also repeat a `flex flex-col gap-1.5` field wrapper 6–8×. Extract one `FieldLabel` and a `Field` (wrapper = label + slot) and use in both.
+- **#2 Shared item-field pieces + `buildItemPayload` helper:** the two forms independently render the same Content (Monaco-vs-Markdown) editor and build the same conditional `{ content?, url?, language? }` payload. Extract a shared `ItemContentEditor` component and a pure, testable `typeSpecificPayload()` helper (`src/lib/item-fields.ts`). (Flag derivation + tags input stay per-form — they diverge by source, so no forced mega-component.)
+- **#3 Shared `ProBadge`:** the violet→pink gradient PRO `Badge` is duplicated in `AppSidebar` and `CreateItemDialog`. Extract `<ProBadge>` (accepts `className` for per-site positioning).
+- **#4 Extract `SidebarUserMenu`:** the sidebar footer user card + sign-out `AlertDialog` (with its own `signOutOpen`/`signingOut` state) is ~95 self-contained lines. Move it into its own component; `AppSidebar` re-exports `SidebarUser` so importers don't break.
+
+Out of scope (deferred): ItemDrawer action-bar split (#5), CreateItemDialog TypeSelect split (#6), lib/db/items.ts file split (#7).
 
 ## Notes
 

@@ -22,16 +22,17 @@ import {
   resolveCreatableType,
   type CreatableSystemType,
 } from "@/lib/item-types";
-import { CodeEditor } from "@/components/dashboard/CodeEditor";
-import { MarkdownEditor } from "@/components/dashboard/MarkdownEditor";
 import { LanguageSelect } from "@/components/dashboard/LanguageSelect";
+import { Field } from "@/components/dashboard/Field";
+import { ItemContentEditor } from "@/components/dashboard/ItemContentEditor";
+import { ProBadge } from "@/components/dashboard/ProBadge";
 import {
   FileUpload,
   type UploadedFile,
 } from "@/components/dashboard/FileUpload";
 import { TagInput } from "@/components/dashboard/TagInput";
+import { typeSpecificPayload } from "@/lib/item-fields";
 import { defaultLanguageForType } from "@/lib/languages";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -68,30 +69,6 @@ const TYPE_META: Record<
   file: { label: "File", icon: FileIcon, color: "#6b7280" },
   image: { label: "Image", icon: ImageIcon, color: "#ec4899" },
 };
-
-function FieldLabel({
-  htmlFor,
-  required,
-  children,
-}: {
-  htmlFor: string;
-  required?: boolean;
-  children: React.ReactNode;
-}) {
-  return (
-    <label
-      htmlFor={htmlFor}
-      className="text-xs font-semibold tracking-wider text-muted-foreground uppercase"
-    >
-      {children}
-      {required ? (
-        <span aria-hidden className="ml-0.5 text-destructive">
-          *
-        </span>
-      ) : null}
-    </label>
-  );
-}
 
 // Default type when opened somewhere without a type context (e.g. dashboard).
 const DEFAULT_TYPE = CREATABLE_SYSTEM_TYPES[0];
@@ -192,10 +169,11 @@ export function CreateItemDialog() {
       title,
       description,
       tags,
+      ...typeSpecificPayload(
+        { showContent, showUrl, showLanguage, isCode },
+        { content, url, language },
+      ),
     };
-    if (showContent) payload.content = content;
-    if (showUrl) payload.url = url;
-    if (showLanguage) payload.language = language;
     if (showUpload) {
       // The schema rejects a file/image item without a completed upload; guard
       // here too so the user gets a clear message instead of a Zod error.
@@ -250,8 +228,7 @@ export function CreateItemDialog() {
           ) : null}
 
           {/* Type */}
-          <div className="flex flex-col gap-1.5">
-            <FieldLabel htmlFor="create-type">Type</FieldLabel>
+          <Field label="Type" htmlFor="create-type">
             <Select
               value={type}
               onValueChange={(value) =>
@@ -286,13 +263,7 @@ export function CreateItemDialog() {
                         })}
                         {label}
                         {PRO_TYPES.has(name) ? (
-                          // Matches the sidebar's PRO badge (violet→pink gradient).
-                          <Badge
-                            variant="outline"
-                            className="ml-auto h-4 border-0 bg-[linear-gradient(to_right,#8b5cf6,#ec4899)] px-1.5 text-[10px] font-semibold tracking-wide text-white uppercase"
-                          >
-                            Pro
-                          </Badge>
+                          <ProBadge className="ml-auto" />
                         ) : null}
                       </span>
                     </SelectItem>
@@ -300,13 +271,10 @@ export function CreateItemDialog() {
                 })}
               </SelectContent>
             </Select>
-          </div>
+          </Field>
 
           {/* Title */}
-          <div className="flex flex-col gap-1.5">
-            <FieldLabel htmlFor="create-title" required>
-              Title
-            </FieldLabel>
+          <Field label="Title" htmlFor="create-title" required>
             <Input
               id="create-title"
               value={title}
@@ -314,11 +282,10 @@ export function CreateItemDialog() {
               required
               placeholder="Title"
             />
-          </div>
+          </Field>
 
           {/* Description */}
-          <div className="flex flex-col gap-1.5">
-            <FieldLabel htmlFor="create-description">Description</FieldLabel>
+          <Field label="Description" htmlFor="create-description">
             <Textarea
               id="create-description"
               value={description}
@@ -326,64 +293,52 @@ export function CreateItemDialog() {
               placeholder="Optional description"
               rows={2}
             />
-          </div>
+          </Field>
 
           {/* Upload — file & image items */}
           {showUpload ? (
-            <div className="flex flex-col gap-1.5">
-              <FieldLabel htmlFor="create-upload" required>
-                {type === "image" ? "Image" : "File"}
-              </FieldLabel>
+            <Field
+              label={type === "image" ? "Image" : "File"}
+              htmlFor="create-upload"
+              required
+            >
               <FileUpload
                 kind={type as "file" | "image"}
                 value={uploaded}
                 onChange={setUploaded}
                 onUploadingChange={setUploading}
               />
-            </div>
+            </Field>
           ) : null}
 
           {/* Content — text-kind items. Code types (snippet/command) use the
               Monaco editor; note & prompt use the Markdown editor. */}
           {showContent ? (
-            <div className="flex flex-col gap-1.5">
-              <FieldLabel htmlFor="create-content">Content</FieldLabel>
-              {isCode ? (
-                <CodeEditor
-                  value={content}
-                  onChange={setContent}
-                  language={language}
-                  placeholder="Paste or write your code…"
-                />
-              ) : (
-                <MarkdownEditor
-                  id="create-content"
-                  value={content}
-                  onChange={setContent}
-                  placeholder="Write Markdown…"
-                />
-              )}
-            </div>
+            <Field label="Content" htmlFor="create-content">
+              <ItemContentEditor
+                isCode={isCode}
+                value={content}
+                onChange={setContent}
+                language={language}
+                markdownId="create-content"
+              />
+            </Field>
           ) : null}
 
           {/* Language — snippet & command only */}
           {showLanguage ? (
-            <div className="flex flex-col gap-1.5">
-              <FieldLabel htmlFor="create-language">Language</FieldLabel>
+            <Field label="Language" htmlFor="create-language">
               <LanguageSelect
                 id="create-language"
                 value={language}
                 onChange={setLanguage}
               />
-            </div>
+            </Field>
           ) : null}
 
           {/* URL — link items */}
           {showUrl ? (
-            <div className="flex flex-col gap-1.5">
-              <FieldLabel htmlFor="create-url" required>
-                URL
-              </FieldLabel>
+            <Field label="URL" htmlFor="create-url" required>
               <Input
                 id="create-url"
                 type="url"
@@ -392,12 +347,11 @@ export function CreateItemDialog() {
                 required
                 placeholder="https://…"
               />
-            </div>
+            </Field>
           ) : null}
 
           {/* Tags */}
-          <div className="flex flex-col gap-1.5">
-            <FieldLabel htmlFor="create-tags">Tags</FieldLabel>
+          <Field label="Tags" htmlFor="create-tags">
             <TagInput
               id="create-tags"
               value={tags}
@@ -408,7 +362,7 @@ export function CreateItemDialog() {
               Press Enter or comma to add. Existing tags are suggested as you
               type.
             </p>
-          </div>
+          </Field>
           </DialogBody>
 
           <DialogFooter>
