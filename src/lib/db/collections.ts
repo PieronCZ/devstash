@@ -3,6 +3,32 @@
 // user, whose id each function receives from the caller.
 
 import { prisma } from "@/lib/prisma";
+import type { CreateCollectionInput } from "@/lib/validations/collections";
+
+// A newly created collection, as returned to the create action's caller.
+export interface CreatedCollection {
+  id: string;
+  name: string;
+  description: string | null;
+}
+
+// Create a collection for the given user. New collections start empty (no items,
+// no default type); name is required, description optional. Returns the created
+// row's core fields.
+export async function createCollection(
+  userId: string,
+  data: CreateCollectionInput,
+): Promise<CreatedCollection> {
+  const created = await prisma.collection.create({
+    data: {
+      name: data.name,
+      description: data.description ?? null,
+      user: { connect: { id: userId } },
+    },
+    select: { id: true, name: true, description: true },
+  });
+  return created;
+}
 
 // A distinct item type present in a collection, for the little icon chips.
 export interface CollectionType {

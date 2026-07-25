@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { auth } from "@/auth";
+import type { ActionResult } from "@/actions/types";
 import type { ItemDetail } from "@/lib/db/items";
 import {
   createItem as createItemQuery,
@@ -14,12 +15,6 @@ import {
 } from "@/lib/db/items";
 import { deleteFromR2, keyFromPublicUrl } from "@/lib/r2";
 import { createItemSchema, updateItemSchema } from "@/lib/validations/items";
-
-// Result shape shared by the item mutations — mirrors the project's
-// { success, data, error } convention (data folded in on success).
-type ActionResult<T = unknown> =
-  | ({ success: true } & T)
-  | { success: false; error: string };
 
 // Re-render the surfaces that show item cards after a mutation. Client callers
 // also `router.refresh()` for the current route; this covers the others.
