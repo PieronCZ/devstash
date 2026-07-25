@@ -1,30 +1,16 @@
-# Current Feature: Collection Create
+# Current Feature
 
 ## Status
 
-In Progress
+Not Started
 
 ## Goals
 
-- Add a "New Collection" button in the top bar that opens a modal to create a collection.
-- Modal collects the fields needed for a collection: **name** (required) and **description** (optional).
-- Persist via a new `createCollection` server action → owner-scoped `lib/db` query fn, following the same auth/validate/revalidate pattern as `createItem`.
-- Collections are **user-scoped**: reads live in `lib/db/collections.ts` (server components) and any client-side calls go through API routes — mirroring the items pattern.
-- Show feedback on success and failure. **Decision:** no toast library — reuse the existing inline `role="alert"` error pattern (like the auth forms) for failures; success closes the dialog + `router.refresh()`.
-- On save, everything reflects the new collection (sidebar Recent, dashboard grid, collection counts) without a manual refresh.
+<!-- Bullet points of what success looks like -->
 
 ## Notes
 
-- Follow the **items patterns** already in the codebase:
-  - Server action surface in `src/actions/` (new `src/actions/collections.ts`), delegating to an owner-scoped query fn in `src/lib/db/collections.ts`.
-  - Zod validation for inputs (new schema, e.g. `createCollectionSchema`).
-  - Client dialog component mirroring `CreateItemDialog` (shadcn Dialog / Base UI), wired to the top-bar "New Collection" trigger.
-  - API routes only for client-side data fetches (e.g. if the dialog needs to look something up) — mutations go through the server action.
-- **Toasts**: the codebase currently has *no toast library* — auth forms use inline `role="alert"` errors. This feature explicitly asks for toasts, so a toast mechanism (e.g. `sonner`) likely needs to be introduced. Confirm approach before adding a dependency.
-- The top bar already has a "New Collection" button rendered display-only (from Dashboard UI Phase 1) — wire it up.
-- `Collection` model already exists (name, description, isFavorite, defaultTypeId, userId, timestamps) — **no DB migration expected**.
-- After save, use `router.refresh()` (as `CreateItemDialog` does) so the sidebar + dashboard re-read from the DB.
-- Add/update Vitest unit tests for the new server action + query fn (per testing policy — business logic only).
+<!-- Additional context, constraints, or details from spec -->
 
 ## History
 
@@ -71,3 +57,4 @@ In Progress
 **File List View** (2026-07-23) - The `/items/files` listing renders a single-column list (Google Drive / Dropbox style) instead of the grid cards. New [FileRow](src/components/dashboard/FileRow.tsx): an extension-based file icon, the item title (+ the original `fileName` as a secondary line when it differs), file size, upload date, pin/favorite indicators, and a direct Download button (Base UI `Button` with `render` anchor to the existing owner-scoped `GET /api/items/[id]/download`; `onClick` stops propagation so it doesn't open the drawer). The row itself is a keyboard-accessible `role="button"` that opens the drawer; name/meta stack vertically on mobile (`flex-col sm:flex-row`), rows divided in a bordered container. [items/[type]/page.tsx](src/app/items/[type]/page.tsx) now branches: file types → `FileRow` list, image types → `ImageCard` grid, everything else → `ItemCard` grid. New pure utility [file-icons.ts](src/lib/file-icons.ts) (`fileExtension` + `getFileIcon`) mapping filename extensions (docs/sheets/archives/images/audio/video/code) to lucide icons, falling back to a generic `File`; handles dotfiles, multi-dot names, and paths. Extended [DashboardItem](src/lib/db/items.ts) (+ `itemSelect`/`toDashboardItem`) with `fileName`/`fileSize`/`createdAt`. 8 new tests (160 pass); `tsc`/lint clean. Build skipped (dev running) — verified via `tsc --noEmit`. No DB migration.
 **Scan Quick Wins (round 2)** (2026-07-24) - Low-risk `code-scanner` cleanups. Wrapped `auth` in React `cache()` ([auth.ts](src/auth.ts)) so the layout + page `auth()` calls dedupe within a request (its `jwt` callback hits the DB each call). Extracted the duplicated type-order comparator into `sortBySystemTypeOrder()` ([item-types.ts](src/lib/item-types.ts), used by `getSidebarItemTypes`/`getProfileStats`) and the duplicated per-collection type tally into `rankItemTypesByUsage()` ([collections.ts](src/lib/db/collections.ts), used by `getRecentCollections`/`getSidebarCollections`); also bounded `getSidebarCollections` to two targeted queries (all favorites + `take: 4` recent) instead of loading every collection. 8 new tests (168 pass); `tsc`/lint clean, Playwright-verified; build skipped (dev running). No DB migration.
 **Componentization — shared item-form & sidebar pieces** (2026-07-24) - De-duplication pass from the large-block audit; pure refactor, no behavior change. New [Field.tsx](src/components/dashboard/Field.tsx) (`FieldLabel` + `Field` wrapper) replaces the label component + `flex flex-col gap-1.5` wrapper both item forms hand-rolled per field. New [ItemContentEditor.tsx](src/components/dashboard/ItemContentEditor.tsx) shares the Monaco-vs-Markdown content switch, and pure [item-fields.ts](src/lib/item-fields.ts)#`typeSpecificPayload()` assembles the conditional `{ content?, url?, language? }` payload both forms built inline (flag derivation + tags input stay per-form — they diverge by source). New [ProBadge.tsx](src/components/dashboard/ProBadge.tsx) shares the violet→pink gradient PRO badge (`className`-configurable) across [AppSidebar](src/components/dashboard/AppSidebar.tsx) + [CreateItemDialog](src/components/dashboard/CreateItemDialog.tsx). New [SidebarUserMenu.tsx](src/components/dashboard/SidebarUserMenu.tsx) extracts the sidebar footer account card + sign-out dialog (owns its own state) out of `AppSidebar` (which re-exports `SidebarUser`). Net −255/+80 across the three refactored components. 5 new tests (173 pass); `tsc`/lint clean, Playwright-verified (create dialog code/link paths, edit drawer, PRO dropdown, user menu); build skipped (dev running). No DB migration. Deferred: ItemDrawer action-bar split (#5), CreateItemDialog TypeSelect split (#6), lib/db/items.ts file split (#7).
+**Collection Create** (2026-07-25) - New-collection creation from a top-bar dialog, mirroring the item-create pattern. New [createCollectionSchema](src/lib/validations/collections.ts) (Zod: `name` required/trimmed/≤100, optional `description` → null when blank) → owner-scoped [createCollection](src/lib/db/collections.ts) query fn (empty collection, `user.connect`, returns the created row) → [createCollection](src/actions/collections.ts) server action (auth/validate/revalidate shell, revalidates `/dashboard` + `/items/[type]`). Extracted the duplicated `ActionResult` result shape into shared [src/actions/types.ts](src/actions/types.ts) (per user feedback) — [items.ts](src/actions/items.ts) now imports it too. New [CreateCollectionDialog](src/components/dashboard/CreateCollectionDialog.tsx) (name + description, no toast lib — inline `role="alert"` on failure, success closes + `router.refresh()` so the sidebar + grids pick up the new collection) replaces the display-only "New collection" button in [TopBar](src/components/dashboard/TopBar.tsx). 11 new tests (184 pass): schema, query fn, action (auth reject / first-Zod-issue / normalized delegation). `tsc`/lint clean; build skipped (dev running). No DB migration (`Collection` model already existed).
