@@ -6,6 +6,7 @@ import { Save, X } from "lucide-react";
 import type { ItemDetail } from "@/lib/db/items";
 import { updateItem } from "@/actions/items";
 import { LanguageSelect } from "@/components/dashboard/LanguageSelect";
+import { CollectionSelect } from "@/components/dashboard/CollectionSelect";
 import { Field } from "@/components/dashboard/Field";
 import { ItemContentEditor } from "@/components/dashboard/ItemContentEditor";
 import { typeSpecificPayload } from "@/lib/item-fields";
@@ -41,6 +42,9 @@ export function ItemDrawerEditForm({
     item.language ?? defaultLanguageForType(item.type.name),
   );
   const [tags, setTags] = useState(item.tags.join(", "));
+  const [collectionIds, setCollectionIds] = useState(
+    item.collections.map((c) => c.id),
+  );
 
   const showContent = item.contentType === "TEXT";
   const showUrl = item.contentType === "URL";
@@ -62,6 +66,7 @@ export function ItemDrawerEditForm({
       title,
       description,
       tags: tags.split(","),
+      collectionIds,
       ...typeSpecificPayload(
         { showContent, showUrl, showLanguage, isCode },
         { content, url, language },
@@ -173,6 +178,14 @@ export function ItemDrawerEditForm({
           placeholder="Comma-separated, e.g. react, hooks"
         />
         <p className="text-xs text-muted-foreground">Separate tags with commas.</p>
+      </Field>
+
+      <Field label="Collections" htmlFor="edit-collections">
+        <CollectionSelect
+          id="edit-collections"
+          value={collectionIds}
+          onChange={setCollectionIds}
+        />
       </Field>
     </form>
   );

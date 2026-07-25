@@ -279,6 +279,28 @@ describe("createItem", () => {
       title: "New snippet",
       // tags normalized by the schema: trimmed, de-duplicated, empties dropped.
       tags: ["a", "b"],
+      // collectionIds defaults to an empty array when omitted.
+      collectionIds: [],
     });
+  });
+
+  it("normalizes and forwards collectionIds to the query", async () => {
+    const detail = { id: "new-1", title: "New snippet" };
+    createItemQuery.mockResolvedValue(detail);
+
+    await createItem({
+      type: "snippet",
+      title: "New snippet",
+      tags: [],
+      collectionIds: ["c1", " c1 ", "", "c2"],
+    });
+
+    expect(createItemQuery).toHaveBeenCalledWith(
+      "user-1",
+      expect.objectContaining({
+        // trimmed, de-duplicated, empties dropped.
+        collectionIds: ["c1", "c2"],
+      }),
+    );
   });
 });

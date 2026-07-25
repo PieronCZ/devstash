@@ -30,6 +30,24 @@ export async function createCollection(
   return created;
 }
 
+// A collection as offered in the item forms' collection picker.
+export interface CollectionOption {
+  id: string;
+  name: string;
+}
+
+// All of the given user's collections (id + name), alphabetical — for the
+// collection picker in the New Item dialog and the drawer edit form.
+export async function getUserCollections(
+  userId: string,
+): Promise<CollectionOption[]> {
+  return prisma.collection.findMany({
+    where: { userId },
+    orderBy: { name: "asc" },
+    select: { id: true, name: true },
+  });
+}
+
 // A distinct item type present in a collection, for the little icon chips.
 export interface CollectionType {
   id: string;

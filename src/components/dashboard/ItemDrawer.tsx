@@ -447,12 +447,12 @@ export function ItemDrawer({
                 <div className="flex flex-col gap-2">
                   <SectionLabel>In Collections</SectionLabel>
                   <div className="flex flex-wrap gap-1.5">
-                    {item.collections.map((name) => (
+                    {item.collections.map((collection) => (
                       <span
-                        key={name}
+                        key={collection.id}
                         className="rounded-md border px-2 py-0.5 text-xs text-foreground"
                       >
-                        {name}
+                        {collection.name}
                       </span>
                     ))}
                   </div>
