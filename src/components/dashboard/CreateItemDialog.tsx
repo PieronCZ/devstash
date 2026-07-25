@@ -23,6 +23,7 @@ import {
   type CreatableSystemType,
 } from "@/lib/item-types";
 import { LanguageSelect } from "@/components/dashboard/LanguageSelect";
+import { CollectionSelect } from "@/components/dashboard/CollectionSelect";
 import { Field } from "@/components/dashboard/Field";
 import { ItemContentEditor } from "@/components/dashboard/ItemContentEditor";
 import { ProBadge } from "@/components/dashboard/ProBadge";
@@ -102,6 +103,7 @@ export function CreateItemDialog() {
     defaultLanguageForType(pageType ?? DEFAULT_TYPE),
   );
   const [tags, setTags] = useState<string[]>([]);
+  const [collectionIds, setCollectionIds] = useState<string[]>([]);
   const [uploaded, setUploaded] = useState<UploadedFile | null>(null);
   const [uploading, setUploading] = useState(false);
 
@@ -125,6 +127,7 @@ export function CreateItemDialog() {
     setUrl("");
     setLanguage(defaultLanguageForType(initialType));
     setTags([]);
+    setCollectionIds([]);
     setUploaded(null);
     setUploading(false);
     setError(null);
@@ -169,6 +172,7 @@ export function CreateItemDialog() {
       title,
       description,
       tags,
+      collectionIds,
       ...typeSpecificPayload(
         { showContent, showUrl, showLanguage, isCode },
         { content, url, language },
@@ -362,6 +366,15 @@ export function CreateItemDialog() {
               Press Enter or comma to add. Existing tags are suggested as you
               type.
             </p>
+          </Field>
+
+          {/* Collections */}
+          <Field label="Collections" htmlFor="create-collections">
+            <CollectionSelect
+              id="create-collections"
+              value={collectionIds}
+              onChange={setCollectionIds}
+            />
           </Field>
           </DialogBody>
 

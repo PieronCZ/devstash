@@ -99,7 +99,7 @@ export interface ItemDetail {
   fileSize: number | null; // bytes, FILE items
   language: string | null;
   tags: string[];
-  collections: string[]; // collection names this item belongs to
+  collections: { id: string; name: string }[]; // collections this item belongs to
   isFavorite: boolean;
   isPinned: boolean;
   createdAt: string; // ISO
@@ -125,7 +125,7 @@ const itemDetailSelect = {
   itemType: { select: { id: true, name: true, icon: true, color: true } },
   tags: { select: { name: true }, orderBy: { name: "asc" } },
   collections: {
-    select: { collection: { select: { name: true } } },
+    select: { collection: { select: { id: true, name: true } } },
     orderBy: { addedAt: "asc" },
   },
 } as const;
@@ -154,13 +154,29 @@ export async function getItemDetail(
     fileSize: item.fileSize,
     language: item.language,
     tags: item.tags.map((t) => t.name),
-    collections: item.collections.map((c) => c.collection.name),
+    collections: item.collections.map((c) => c.collection),
     isFavorite: item.isFavorite,
     isPinned: item.isPinned,
     createdAt: item.createdAt.toISOString(),
     updatedAt: item.updatedAt.toISOString(),
     type: item.itemType,
   };
+}
+
+// Build the nested-write payload connecting an item to the given collections,
+// filtered to those actually owned by `userId` — so a client can't slip in
+// another user's collection id. Returns an array suitable for the `create` side
+// of an ItemCollection relation write (empty when nothing is owned/requested).
+async function ownedCollectionConnects(
+  userId: string,
+  collectionIds: string[],
+): Promise<{ collection: { connect: { id: string } } }[]> {
+  if (collectionIds.length === 0) return [];
+  const owned = await prisma.collection.findMany({
+    where: { userId, id: { in: collectionIds } },
+    select: { id: true },
+  });
+  return owned.map((c) => ({ collection: { connect: { id: c.id } } }));
 }
 
 // Update an item's editable fields, scoped to its owner. Returns the refreshed
@@ -198,6 +214,16 @@ export async function updateItem(
   if (data.content !== undefined) updateData.content = data.content;
   if (data.url !== undefined) updateData.url = data.url;
   if (data.language !== undefined) updateData.language = data.language;
+
+  // Collection membership: reconcile wholesale only when the client sent it —
+  // clear the existing join rows, then re-attach the owned set. Omitting the
+  // field leaves membership untouched.
+  if (data.collectionIds !== undefined) {
+    updateData.collections = {
+      deleteMany: {},
+      create: await ownedCollectionConnects(userId, data.collectionIds),
+    };
+  }
 
   await prisma.item.update({ where: { id }, data: updateData });
 
@@ -246,6 +272,10 @@ export async function createItem(
           where: { name_userId: { name, userId } },
           create: { name, user: { connect: { id: userId } } },
         })),
+      },
+      // Attach to the selected collections, filtered to those the user owns.
+      collections: {
+        create: await ownedCollectionConnects(userId, data.collectionIds),
       },
     },
     select: { id: true },

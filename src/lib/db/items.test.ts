@@ -7,13 +7,16 @@ import {
   getItemFile,
   toggleItemFavorite,
   toggleItemPin,
+  updateItem,
 } from "@/lib/db/items";
 
 const findFirst = vi.fn();
 const updateMany = vi.fn();
 const deleteMany = vi.fn();
 const create = vi.fn();
+const update = vi.fn();
 const itemTypeFindFirst = vi.fn();
+const collectionFindMany = vi.fn();
 vi.mock("@/lib/prisma", () => ({
   prisma: {
     item: {
@@ -21,15 +24,21 @@ vi.mock("@/lib/prisma", () => ({
       updateMany: (...args: unknown[]) => updateMany(...args),
       deleteMany: (...args: unknown[]) => deleteMany(...args),
       create: (...args: unknown[]) => create(...args),
+      update: (...args: unknown[]) => update(...args),
     },
     itemType: {
       findFirst: (...args: unknown[]) => itemTypeFindFirst(...args),
+    },
+    collection: {
+      findMany: (...args: unknown[]) => collectionFindMany(...args),
     },
   },
 }));
 
 beforeEach(() => {
   vi.clearAllMocks();
+  // Default: no collections requested/owned unless a test overrides it.
+  collectionFindMany.mockResolvedValue([]);
 });
 
 describe("getItemDetail", () => {
@@ -69,8 +78,8 @@ describe("getItemDetail", () => {
       itemType: { id: "t1", name: "snippet", icon: "Code", color: "#3b82f6" },
       tags: [{ name: "hooks" }, { name: "react" }],
       collections: [
-        { collection: { name: "React Patterns" } },
-        { collection: { name: "Interview Prep" } },
+        { collection: { id: "c1", name: "React Patterns" } },
+        { collection: { id: "c2", name: "Interview Prep" } },
       ],
     });
 
@@ -88,7 +97,10 @@ describe("getItemDetail", () => {
       fileSize: null,
       language: "typescript",
       tags: ["hooks", "react"],
-      collections: ["React Patterns", "Interview Prep"],
+      collections: [
+        { id: "c1", name: "React Patterns" },
+        { id: "c2", name: "Interview Prep" },
+      ],
       isFavorite: true,
       isPinned: false,
       createdAt: "2025-03-12T10:00:00.000Z",
@@ -219,6 +231,7 @@ describe("createItem", () => {
       type: "snippet",
       title: "T",
       tags: [],
+      collectionIds: [],
     });
 
     expect(res).toBeNull();
@@ -230,7 +243,12 @@ describe("createItem", () => {
     create.mockResolvedValue({ id: "new-1" });
     findFirst.mockResolvedValue(detailRow);
 
-    await createItem("user-1", { type: "note", title: "T", tags: [] });
+    await createItem("user-1", {
+      type: "note",
+      title: "T",
+      tags: [],
+      collectionIds: [],
+    });
 
     expect(itemTypeFindFirst).toHaveBeenCalledWith({
       where: { isSystem: true, name: "note" },
@@ -250,6 +268,7 @@ describe("createItem", () => {
       content: "export const x = 1;",
       language: "typescript",
       tags: ["react", "hooks"],
+      collectionIds: [],
     });
 
     expect(create).toHaveBeenCalledWith(
@@ -290,6 +309,7 @@ describe("createItem", () => {
       title: "Docs",
       url: "https://example.com",
       tags: [],
+      collectionIds: [],
     });
 
     expect(create).toHaveBeenCalledWith(
@@ -316,6 +336,7 @@ describe("createItem", () => {
       // language is not a prompt field — even if present it must be dropped.
       language: "typescript",
       tags: [],
+      collectionIds: [],
     });
 
     expect(create).toHaveBeenCalledWith(
@@ -338,6 +359,7 @@ describe("createItem", () => {
       type: "snippet",
       title: "T",
       tags: [],
+      collectionIds: [],
     });
 
     expect(findFirst).toHaveBeenCalledWith(
@@ -360,6 +382,7 @@ describe("createItem", () => {
         fileName: "abc.png",
         fileSize: 1234,
         tags: [],
+        collectionIds: [],
       });
 
       expect(create).toHaveBeenCalledWith(
@@ -377,6 +400,148 @@ describe("createItem", () => {
       );
     },
   );
+
+  it("connects only the collections the user actually owns", async () => {
+    itemTypeFindFirst.mockResolvedValue({ id: "type-1" });
+    create.mockResolvedValue({ id: "new-1" });
+    findFirst.mockResolvedValue(detailRow);
+    // The client sent three ids but only two belong to the user.
+    collectionFindMany.mockResolvedValue([{ id: "c1" }, { id: "c2" }]);
+
+    await createItem("user-1", {
+      type: "snippet",
+      title: "T",
+      tags: [],
+      collectionIds: ["c1", "c2", "c3-not-owned"],
+    });
+
+    expect(collectionFindMany).toHaveBeenCalledWith({
+      where: { userId: "user-1", id: { in: ["c1", "c2", "c3-not-owned"] } },
+      select: { id: true },
+    });
+    expect(create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          collections: {
+            create: [
+              { collection: { connect: { id: "c1" } } },
+              { collection: { connect: { id: "c2" } } },
+            ],
+          },
+        }),
+      }),
+    );
+  });
+
+  it("skips the ownership query and connects nothing when no collections are requested", async () => {
+    itemTypeFindFirst.mockResolvedValue({ id: "type-1" });
+    create.mockResolvedValue({ id: "new-1" });
+    findFirst.mockResolvedValue(detailRow);
+
+    await createItem("user-1", {
+      type: "snippet",
+      title: "T",
+      tags: [],
+      collectionIds: [],
+    });
+
+    expect(collectionFindMany).not.toHaveBeenCalled();
+    expect(create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ collections: { create: [] } }),
+      }),
+    );
+  });
+});
+
+describe("updateItem", () => {
+  // Full row so both the existence check and the getItemDetail re-fetch (which
+  // maps tags/collections) are satisfied by the shared findFirst mock.
+  const detailRow = {
+    id: "item-1",
+    title: "T",
+    description: null,
+    contentType: "TEXT",
+    content: null,
+    url: null,
+    fileUrl: null,
+    fileName: null,
+    fileSize: null,
+    language: null,
+    isFavorite: false,
+    isPinned: false,
+    createdAt: new Date("2025-01-01T00:00:00.000Z"),
+    updatedAt: new Date("2025-01-01T00:00:00.000Z"),
+    itemType: { id: "type-1", name: "note", icon: "StickyNote", color: "#fde047" },
+    tags: [],
+    collections: [],
+  };
+
+  beforeEach(() => {
+    // Item exists / is owned, and getItemDetail re-fetch returns a full row.
+    findFirst.mockResolvedValue(detailRow);
+    update.mockResolvedValue({ id: "item-1" });
+  });
+
+  it("returns null when the item isn't found / not owned", async () => {
+    findFirst.mockResolvedValue(null);
+    expect(
+      await updateItem("user-1", "item-1", { title: "T", tags: [] }),
+    ).toBeNull();
+    expect(update).not.toHaveBeenCalled();
+  });
+
+  it("reconciles membership when collectionIds is present (clear + re-attach owned)", async () => {
+    collectionFindMany.mockResolvedValue([{ id: "c2" }]);
+
+    await updateItem("user-1", "item-1", {
+      title: "T",
+      tags: [],
+      collectionIds: ["c2", "c9-not-owned"],
+    });
+
+    expect(collectionFindMany).toHaveBeenCalledWith({
+      where: { userId: "user-1", id: { in: ["c2", "c9-not-owned"] } },
+      select: { id: true },
+    });
+    expect(update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: "item-1" },
+        data: expect.objectContaining({
+          collections: {
+            deleteMany: {},
+            create: [{ collection: { connect: { id: "c2" } } }],
+          },
+        }),
+      }),
+    );
+  });
+
+  it("clears all memberships when collectionIds is present but empty", async () => {
+    await updateItem("user-1", "item-1", {
+      title: "T",
+      tags: [],
+      collectionIds: [],
+    });
+
+    expect(update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          collections: { deleteMany: {}, create: [] },
+        }),
+      }),
+    );
+  });
+
+  it("leaves membership untouched when collectionIds is omitted", async () => {
+    await updateItem("user-1", "item-1", { title: "T", tags: [] });
+
+    expect(collectionFindMany).not.toHaveBeenCalled();
+    const call = update.mock.calls[0][0] as {
+      data: Record<string, unknown>;
+    };
+    expect(call.data).not.toHaveProperty("collections");
+  });
 });
 
 describe("getItemFile", () => {

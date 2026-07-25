@@ -7,6 +7,13 @@ import { CREATABLE_SYSTEM_TYPES } from "@/lib/item-types";
 const emptyToNull = (value: unknown) =>
   typeof value === "string" && value.trim() === "" ? null : value;
 
+// Collection ids the item should belong to. Trimmed, empties dropped, and
+// de-duplicated so the membership set is always clean. Ownership of each id is
+// enforced in the query layer (a non-owned id is silently ignored).
+const collectionIds = z
+  .array(z.string())
+  .transform((arr) => [...new Set(arr.map((id) => id.trim()).filter(Boolean))]);
+
 // Payload for editing an item from the drawer. All fields the UI can change are
 // covered here; the item's type, collections, and timestamps are not editable.
 // Type-specific fields (content/url/language) are optional — the client only
@@ -24,6 +31,9 @@ export const updateItemSchema = z.object({
   tags: z
     .array(z.string())
     .transform((arr) => [...new Set(arr.map((t) => t.trim()).filter(Boolean))]),
+  // Collection membership is reconciled only when present — the edit form always
+  // sends it, so present means "these are the collections now".
+  collectionIds: collectionIds.optional(),
 });
 
 export type UpdateItemInput = z.infer<typeof updateItemSchema>;
@@ -59,6 +69,8 @@ export const createItemSchema = z
     tags: z
       .array(z.string())
       .transform((arr) => [...new Set(arr.map((t) => t.trim()).filter(Boolean))]),
+    // Collections the new item should be added to (may be empty).
+    collectionIds: collectionIds.default([]),
   })
   .superRefine((data, ctx) => {
     // Link items are useless without a URL — the one type-specific requirement.
