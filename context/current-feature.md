@@ -1,16 +1,30 @@
-# Current Feature
+# Current Feature: Collection Create
 
 ## Status
 
-Not Started
+In Progress
 
 ## Goals
 
-<!-- Bullet points of what success looks like -->
+- Add a "New Collection" button in the top bar that opens a modal to create a collection.
+- Modal collects the fields needed for a collection: **name** (required) and **description** (optional).
+- Persist via a new `createCollection` server action → owner-scoped `lib/db` query fn, following the same auth/validate/revalidate pattern as `createItem`.
+- Collections are **user-scoped**: reads live in `lib/db/collections.ts` (server components) and any client-side calls go through API routes — mirroring the items pattern.
+- Show feedback on success and failure. **Decision:** no toast library — reuse the existing inline `role="alert"` error pattern (like the auth forms) for failures; success closes the dialog + `router.refresh()`.
+- On save, everything reflects the new collection (sidebar Recent, dashboard grid, collection counts) without a manual refresh.
 
 ## Notes
 
-<!-- Additional context, constraints, or details from spec -->
+- Follow the **items patterns** already in the codebase:
+  - Server action surface in `src/actions/` (new `src/actions/collections.ts`), delegating to an owner-scoped query fn in `src/lib/db/collections.ts`.
+  - Zod validation for inputs (new schema, e.g. `createCollectionSchema`).
+  - Client dialog component mirroring `CreateItemDialog` (shadcn Dialog / Base UI), wired to the top-bar "New Collection" trigger.
+  - API routes only for client-side data fetches (e.g. if the dialog needs to look something up) — mutations go through the server action.
+- **Toasts**: the codebase currently has *no toast library* — auth forms use inline `role="alert"` errors. This feature explicitly asks for toasts, so a toast mechanism (e.g. `sonner`) likely needs to be introduced. Confirm approach before adding a dependency.
+- The top bar already has a "New Collection" button rendered display-only (from Dashboard UI Phase 1) — wire it up.
+- `Collection` model already exists (name, description, isFavorite, defaultTypeId, userId, timestamps) — **no DB migration expected**.
+- After save, use `router.refresh()` (as `CreateItemDialog` does) so the sidebar + dashboard re-read from the DB.
+- Add/update Vitest unit tests for the new server action + query fn (per testing policy — business logic only).
 
 ## History
 
