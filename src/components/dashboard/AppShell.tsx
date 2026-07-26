@@ -5,7 +5,9 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { getSidebarCollections } from "@/lib/db/collections";
 import { getSidebarItemTypes } from "@/lib/db/items";
+import { getSearchData } from "@/lib/db/search";
 import { AppSidebar, type SidebarUser } from "@/components/dashboard/AppSidebar";
+import { CommandPaletteProvider } from "@/components/dashboard/CommandPaletteProvider";
 import { ItemDrawerProvider } from "@/components/dashboard/ItemDrawerProvider";
 import { TopBar } from "@/components/dashboard/TopBar";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
@@ -28,9 +30,10 @@ export async function AppShell({
   const userId = session?.user?.id;
   if (!userId) redirect("/sign-in");
 
-  const [itemTypes, collections, dbUser] = await Promise.all([
+  const [itemTypes, collections, searchData, dbUser] = await Promise.all([
     getSidebarItemTypes(userId),
     getSidebarCollections(userId),
+    getSearchData(userId),
     // `isPro` isn't on the token — fetch it (and the freshest name/image) for
     // the footer user card.
     prisma.user.findUnique({
@@ -53,10 +56,16 @@ export async function AppShell({
       <SidebarProvider defaultOpen={defaultOpen} className="h-svh">
         <AppSidebar itemTypes={itemTypes} collections={collections} user={user} />
         <SidebarInset className="min-h-0 overflow-hidden">
-          <TopBar />
-          <main className="min-h-0 flex-1 overflow-y-auto p-6">
-            <ItemDrawerProvider>{children}</ItemDrawerProvider>
-          </main>
+          {/* Both providers wrap the top bar + content so the palette (and the
+              search button in the top bar) can open the item drawer. */}
+          <ItemDrawerProvider>
+            <CommandPaletteProvider data={searchData}>
+              <TopBar />
+              <main className="min-h-0 flex-1 overflow-y-auto p-6">
+                {children}
+              </main>
+            </CommandPaletteProvider>
+          </ItemDrawerProvider>
         </SidebarInset>
       </SidebarProvider>
     </TooltipProvider>
