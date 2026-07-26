@@ -5,19 +5,25 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 // getCollectionDetail uses prisma.collection.findFirst, so mock both.
 const collectionCreate = vi.fn();
 const collectionFindFirst = vi.fn();
+const collectionUpdateMany = vi.fn();
+const collectionDeleteMany = vi.fn();
 vi.mock("@/lib/prisma", () => ({
   prisma: {
     collection: {
       create: (...args: unknown[]) => collectionCreate(...args),
       findFirst: (...args: unknown[]) => collectionFindFirst(...args),
+      updateMany: (...args: unknown[]) => collectionUpdateMany(...args),
+      deleteMany: (...args: unknown[]) => collectionDeleteMany(...args),
     },
   },
 }));
 
 import {
   createCollection,
+  deleteCollection,
   getCollectionDetail,
   rankItemTypesByUsage,
+  updateCollection,
 } from "@/lib/db/collections";
 
 beforeEach(() => {
@@ -100,6 +106,79 @@ describe("createCollection", () => {
         data: expect.objectContaining({ description: null }),
       }),
     );
+  });
+});
+
+describe("updateCollection", () => {
+  it("writes name + description scoped to the owner and returns the refreshed row", async () => {
+    collectionUpdateMany.mockResolvedValue({ count: 1 });
+    collectionFindFirst.mockResolvedValue({
+      id: "col-1",
+      name: "React Patterns",
+      description: "Now with hooks",
+    });
+
+    const result = await updateCollection("user-1", "col-1", {
+      name: "React Patterns",
+      description: "Now with hooks",
+    });
+
+    expect(result).toEqual({
+      id: "col-1",
+      name: "React Patterns",
+      description: "Now with hooks",
+    });
+    expect(collectionUpdateMany).toHaveBeenCalledWith({
+      where: { id: "col-1", userId: "user-1" },
+      data: { name: "React Patterns", description: "Now with hooks" },
+    });
+  });
+
+  it("stores a null description when cleared", async () => {
+    collectionUpdateMany.mockResolvedValue({ count: 1 });
+    collectionFindFirst.mockResolvedValue({
+      id: "col-1",
+      name: "React Patterns",
+      description: null,
+    });
+
+    await updateCollection("user-1", "col-1", { name: "React Patterns" });
+
+    expect(collectionUpdateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ description: null }),
+      }),
+    );
+  });
+
+  it("returns null (without re-fetching) when nothing was updated (not owned)", async () => {
+    collectionUpdateMany.mockResolvedValue({ count: 0 });
+
+    const result = await updateCollection("user-1", "col-x", { name: "X" });
+
+    expect(result).toBeNull();
+    expect(collectionFindFirst).not.toHaveBeenCalled();
+  });
+});
+
+describe("deleteCollection", () => {
+  it("deletes scoped to the owner and returns true when a row was removed", async () => {
+    collectionDeleteMany.mockResolvedValue({ count: 1 });
+
+    const result = await deleteCollection("user-1", "col-1");
+
+    expect(result).toBe(true);
+    expect(collectionDeleteMany).toHaveBeenCalledWith({
+      where: { id: "col-1", userId: "user-1" },
+    });
+  });
+
+  it("returns false when nothing was deleted (not found / not owned)", async () => {
+    collectionDeleteMany.mockResolvedValue({ count: 0 });
+
+    const result = await deleteCollection("user-1", "col-x");
+
+    expect(result).toBe(false);
   });
 });
 

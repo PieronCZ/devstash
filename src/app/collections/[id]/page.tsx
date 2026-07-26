@@ -5,6 +5,7 @@ import { requireUserId } from "@/lib/session";
 import { getCollectionDetail } from "@/lib/db/collections";
 import { ItemCard } from "@/components/dashboard/ItemCard";
 import { ImageCard } from "@/components/dashboard/ImageCard";
+import { CollectionDetailActions } from "@/components/dashboard/CollectionDetailActions";
 
 export default async function CollectionDetailPage({
   params,
@@ -30,21 +31,32 @@ export default async function CollectionDetailPage({
   return (
     <div className="space-y-8">
       {/* Page header */}
-      <div>
-        <h1 className="flex items-center gap-2 text-2xl font-semibold tracking-tight">
-          {collection.name}
-          {collection.isFavorite ? (
-            <Star className="size-5 shrink-0 fill-amber-400 text-amber-400" />
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="flex items-center gap-2 text-2xl font-semibold tracking-tight">
+            {collection.name}
+            {collection.isFavorite ? (
+              <Star className="size-5 shrink-0 fill-amber-400 text-amber-400" />
+            ) : null}
+          </h1>
+          {collection.description ? (
+            <p className="mt-1.5 text-sm text-muted-foreground">
+              {collection.description}
+            </p>
           ) : null}
-        </h1>
-        {collection.description ? (
-          <p className="mt-1.5 text-sm text-muted-foreground">
-            {collection.description}
+          <p className="mt-1 text-sm text-muted-foreground">
+            {items.length} {items.length === 1 ? "item" : "items"}
           </p>
-        ) : null}
-        <p className="mt-1 text-sm text-muted-foreground">
-          {items.length} {items.length === 1 ? "item" : "items"}
-        </p>
+        </div>
+
+        <CollectionDetailActions
+          collection={{
+            id: collection.id,
+            name: collection.name,
+            description: collection.description,
+            isFavorite: collection.isFavorite,
+          }}
+        />
       </div>
 
       {/* Collections hold mixed types: non-image items render as generic cards,

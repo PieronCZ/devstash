@@ -16,3 +16,15 @@ export const createCollectionSchema = z.object({
 });
 
 export type CreateCollectionInput = z.infer<typeof createCollectionSchema>;
+
+// Payload for editing a collection's metadata from the Edit dialog. Same shape
+// as create — only name and description are editable (collections have no
+// type-specific fields). The edit form always submits both fields.
+export const updateCollectionSchema = z.object({
+  name: z.string().trim().min(1, "Name is required").max(100),
+  description: z
+    .preprocess(emptyToNull, z.string().trim().nullable())
+    .optional(),
+});
+
+export type UpdateCollectionInput = z.infer<typeof updateCollectionSchema>;
