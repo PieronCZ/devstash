@@ -33,8 +33,9 @@ export interface DashboardItem {
   type: DashboardItemType;
 }
 
-// What we need to select from an Item to build a DashboardItem (card).
-const itemSelect = {
+// What we need to select from an Item to build a DashboardItem (card). Exported
+// so collection reads can select the same card shape on their nested items.
+export const itemSelect = {
   id: true,
   title: true,
   description: true,
@@ -66,7 +67,7 @@ type ItemRow = {
   tags: { name: string }[];
 };
 
-function toDashboardItem(item: ItemRow): DashboardItem {
+export function toDashboardItem(item: ItemRow): DashboardItem {
   return {
     id: item.id,
     title: item.title,

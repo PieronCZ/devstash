@@ -8,7 +8,6 @@ import {
   ChevronRight,
   Circle,
   Clock,
-  Plus,
   Sparkles,
   Star,
 } from "lucide-react";
@@ -34,7 +33,6 @@ import {
   SidebarContent,
   SidebarFooter,
   SidebarGroup,
-  SidebarGroupAction,
   SidebarGroupContent,
   SidebarGroupLabel,
   SidebarHeader,
@@ -184,14 +182,6 @@ export function AppSidebar({ itemTypes, collections, user }: AppSidebarProps) {
               />
               Collections
             </SidebarGroupLabel>
-            <SidebarGroupAction
-              title="New collection"
-              render={<Link href="/collections/new" />}
-            >
-              <Plus />
-              <span className="sr-only">New collection</span>
-            </SidebarGroupAction>
-
             <CollapsibleContent>
               <SidebarGroupContent>
                 <p className="px-2 pt-2 pb-0.5 text-[11px] font-medium uppercase tracking-wider text-sidebar-foreground/45 group-data-[collapsible=icon]:hidden">

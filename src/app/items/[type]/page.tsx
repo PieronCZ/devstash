@@ -1,7 +1,7 @@
 import { createElement } from "react";
-import { notFound, redirect } from "next/navigation";
+import { notFound } from "next/navigation";
 
-import { auth } from "@/auth";
+import { requireUserId } from "@/lib/session";
 import {
   getItemsByType,
   getSystemItemType,
@@ -17,9 +17,7 @@ export default async function ItemsByTypePage({
 }: {
   params: Promise<{ type: string }>;
 }) {
-  const session = await auth();
-  const userId = session?.user?.id;
-  if (!userId) redirect("/sign-in");
+  const userId = await requireUserId();
 
   const { type } = await params;
   const typeName = resolveSystemTypeName(type);
