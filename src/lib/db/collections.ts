@@ -8,7 +8,10 @@ import {
   toDashboardItem,
   type DashboardItem,
 } from "@/lib/db/items";
-import type { CreateCollectionInput } from "@/lib/validations/collections";
+import type {
+  CreateCollectionInput,
+  UpdateCollectionInput,
+} from "@/lib/validations/collections";
 
 // A newly created collection, as returned to the create action's caller.
 export interface CreatedCollection {
@@ -33,6 +36,45 @@ export async function createCollection(
     select: { id: true, name: true, description: true },
   });
   return created;
+}
+
+// Update a collection's metadata, scoped to its owner. Uses `updateMany` with an
+// owner-scoped `where` so a non-owner (or missing collection) writes nothing —
+// reported to the caller as `null` (→ "not found") rather than mutated. The edit
+// form always submits both fields, so both are always written. Returns the
+// refreshed core fields.
+export async function updateCollection(
+  userId: string,
+  collectionId: string,
+  data: UpdateCollectionInput,
+): Promise<CreatedCollection | null> {
+  const result = await prisma.collection.updateMany({
+    where: { id: collectionId, userId },
+    data: {
+      name: data.name,
+      description: data.description ?? null,
+    },
+  });
+  if (result.count === 0) return null;
+
+  return prisma.collection.findFirst({
+    where: { id: collectionId, userId },
+    select: { id: true, name: true, description: true },
+  });
+}
+
+// Permanently delete a collection, scoped to its owner. Returns whether a row was
+// removed (false when not found or not owned). The `ItemCollection` join has
+// `onDelete: Cascade`, so this removes only the join rows — the items themselves
+// are left intact, they simply no longer belong to this collection.
+export async function deleteCollection(
+  userId: string,
+  collectionId: string,
+): Promise<boolean> {
+  const result = await prisma.collection.deleteMany({
+    where: { id: collectionId, userId },
+  });
+  return result.count > 0;
 }
 
 // A collection as offered in the item forms' collection picker.

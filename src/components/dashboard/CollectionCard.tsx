@@ -4,6 +4,7 @@ import { Star } from "lucide-react";
 import type { DashboardCollection } from "@/lib/db/collections";
 import { getTypeIcon } from "@/lib/icons";
 import { relativeTime } from "@/lib/format";
+import { CollectionCardMenu } from "@/components/dashboard/CollectionCardMenu";
 
 export function CollectionCard({
   collection,
@@ -11,16 +12,28 @@ export function CollectionCard({
   collection: DashboardCollection;
 }) {
   return (
-    <Link
-      href={`/collections/${collection.id}`}
+    // Not a <Link> wrapper: the stretched link below makes the whole card
+    // navigate, while the 3-dots menu (relative z-10) stays independently
+    // clickable and doesn't nest interactive content inside an anchor.
+    <div
       style={{ borderTopColor: collection.accentColor }}
-      className="flex flex-col rounded-xl border border-t-2 bg-card p-4 transition-colors hover:bg-accent/40"
+      className="relative flex flex-col rounded-xl border border-t-2 bg-card p-4 transition-colors hover:bg-accent/40"
     >
+      {/* Click-through: covers the card, sits under the menu. */}
+      <Link
+        href={`/collections/${collection.id}`}
+        aria-label={`Open ${collection.name}`}
+        className="absolute inset-0 rounded-xl"
+      />
+
       <div className="flex items-start justify-between gap-2">
         <h3 className="font-semibold leading-tight">{collection.name}</h3>
-        {collection.isFavorite ? (
-          <Star className="size-4 shrink-0 fill-amber-400 text-amber-400" />
-        ) : null}
+        <div className="flex shrink-0 items-center gap-1">
+          {collection.isFavorite ? (
+            <Star className="size-4 fill-amber-400 text-amber-400" />
+          ) : null}
+          <CollectionCardMenu collection={collection} />
+        </div>
       </div>
 
       {collection.description ? (
@@ -49,6 +62,6 @@ export function CollectionCard({
           <div>{relativeTime(collection.updatedAt)}</div>
         </div>
       </div>
-    </Link>
+    </div>
   );
 }
