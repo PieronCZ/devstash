@@ -3,7 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ArrowLeft, FolderOpen, Layers } from "lucide-react";
 
-import { auth } from "@/auth";
+import { requireUserId } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { getProfileStats } from "@/lib/db/profile";
 import { getTypeIcon } from "@/lib/icons";
@@ -23,11 +23,10 @@ const joinDateFormat = new Intl.DateTimeFormat("en-US", {
 });
 
 export default async function ProfilePage() {
-  const session = await auth();
-  if (!session?.user?.id) redirect("/sign-in?callbackUrl=/profile");
+  const userId = await requireUserId("/profile");
 
   const user = await prisma.user.findUnique({
-    where: { id: session.user.id },
+    where: { id: userId },
     select: {
       name: true,
       email: true,
@@ -41,7 +40,7 @@ export default async function ProfilePage() {
 
   if (!user) redirect("/sign-in");
 
-  const stats = await getProfileStats(session.user.id);
+  const stats = await getProfileStats(userId);
 
   const hasPassword = !!user.passwordHash;
   const oauthProviders = user.accounts.map((a) => a.provider);

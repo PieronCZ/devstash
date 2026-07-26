@@ -3,6 +3,11 @@
 // user, whose id each function receives from the caller.
 
 import { prisma } from "@/lib/prisma";
+import {
+  itemSelect,
+  toDashboardItem,
+  type DashboardItem,
+} from "@/lib/db/items";
 import type { CreateCollectionInput } from "@/lib/validations/collections";
 
 // A newly created collection, as returned to the create action's caller.
@@ -132,6 +137,50 @@ export async function getRecentCollections(
       types,
     };
   });
+}
+
+// One collection plus the items it holds, for the /collections/[id] detail page.
+export interface CollectionDetail {
+  id: string;
+  name: string;
+  description: string | null;
+  isFavorite: boolean;
+  items: DashboardItem[]; // pinned first, then most-recently updated
+}
+
+// Full detail for one collection, scoped to its owner: its core fields plus the
+// items it holds (as card shapes). Items float pinned to the top, then order by
+// most-recently updated — matching the type listings. Returns null when the
+// collection doesn't exist or isn't owned by `userId` (caller 404s).
+export async function getCollectionDetail(
+  userId: string,
+  collectionId: string,
+): Promise<CollectionDetail | null> {
+  const collection = await prisma.collection.findFirst({
+    where: { id: collectionId, userId },
+    select: {
+      id: true,
+      name: true,
+      description: true,
+      isFavorite: true,
+      items: {
+        orderBy: [
+          { item: { isPinned: "desc" } },
+          { item: { updatedAt: "desc" } },
+        ],
+        select: { item: { select: itemSelect } },
+      },
+    },
+  });
+  if (!collection) return null;
+
+  return {
+    id: collection.id,
+    name: collection.name,
+    description: collection.description,
+    isFavorite: collection.isFavorite,
+    items: collection.items.map((ic) => toDashboardItem(ic.item)),
+  };
 }
 
 // A collection as shown in the sidebar's Collections group.
