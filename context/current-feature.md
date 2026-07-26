@@ -1,26 +1,16 @@
-# Current Feature: Global Search / Command Palette
+# Current Feature
 
 ## Status
 
-In Progress
+Not Started
 
 ## Goals
 
-- Global command palette opened with Cmd+K (Mac) / Ctrl+K (Windows)
-- Fuzzy search across all items and collections, client-side (no server round-trips)
-- Results grouped into an Items section and a Collections section
-- Keyboard navigation (arrow keys to move, Enter to select)
-- Each result shows its item type icon; collections show their item count
-- Selecting a result navigates to the item drawer or the collection page
-- TopBar search input opens the palette on click and shows a ⌘K hint in its placeholder
-- Search bar moved to the center of the TopBar (instead of right-aligned)
+<!-- Bullet points of what success looks like -->
 
 ## Notes
 
-- Use the shadcn `cmdk` component (Command)
-- Pre-fetch searchable data on app load: items (id, title, type, content preview) and collections (id, name, itemCount)
-- Reuse existing data-fetching functions where possible
-- Spec: `context/features/global-search-spec.md`
+<!-- Additional context, constraints, or details from spec -->
 
 ## History
 
@@ -71,3 +61,4 @@ In Progress
 **Add Item to Collections** (2026-07-25) - Multi-select collection picker on the New Item dialog + drawer edit form, persisting via the existing `ItemCollection` join table (forms only). Both item schemas gain a shared `collectionIds` (trimmed/de-duped; create defaults `[]`, update reconciles only when present). Owner-scoped `ownedCollectionConnects()` ([lib/db/items.ts](src/lib/db/items.ts)) filters out non-owned ids; `createItem` attaches, `updateItem` reconciles (`deleteMany` + `create`). `ItemDetail.collections` `string[]` → `{id,name}[]` (id for edit pre-select, name for display). New [getUserCollections](src/lib/db/collections.ts) behind `GET /api/collections`, consumed by new [CollectionSelect](src/components/dashboard/CollectionSelect.tsx) (chip + checkbox-dropdown). 7 new tests (191 pass); `tsc`/lint clean. **Browser verification not done** (Playwright declined). Build skipped (dev running). No DB migration.
 **Collections Pages** (2026-07-26) - New `/collections` (all collections, `CollectionCard` grid) and `/collections/[id]` (owner-scoped `getCollectionDetail`, 404s when not owned): non-image `ItemCard`s then an "Images" gallery of `ImageCard` thumbnails. Extracted `requireUserId()` auth guard, adopted across the 5 protected pages; removed the sidebar's dead `/collections/new` action; `/collections` protected in the proxy. 7 new tests (198 pass); `tsc`/lint clean. Build skipped (dev running). No DB migration.
 **Collection Edit, Delete & Favorite Actions** (2026-07-26) - Edit/Delete/Favorite in the `/collections/[id]` header + a 3-dot dropdown on each `CollectionCard`. Edit opens a metadata modal ([EditCollectionDialog](src/components/dashboard/EditCollectionDialog.tsx)); Delete confirms via `AlertDialog` ([DeleteCollectionDialog](src/components/dashboard/DeleteCollectionDialog.tsx)) and removes only the collection (`ItemCollection` cascade drops joins — items kept); Favorite is UI-only. `CollectionCard` reworked to a stretched-link card so clicking anywhere navigates while the menu stays clickable. New `updateCollectionSchema`, owner-scoped `updateCollection`/`deleteCollection` query fns + actions. 17 new tests (215 pass); `tsc`/lint clean. Build skipped (dev running). No DB migration.
+**Global Search / Command Palette** (2026-07-26) - Cmd+K / Ctrl+K palette (`cmdk` + [command.tsx](src/components/ui/command.tsx)) with client-side search across items + collections, grouped, keyboard-navigable. [getSearchData](src/lib/db/search.ts) pre-fetches a light snapshot in [AppShell](src/components/dashboard/AppShell.tsx) → client [CommandPaletteProvider](src/components/dashboard/CommandPaletteProvider.tsx) (open state + global shortcut); selecting an item opens the drawer, a collection navigates to its page. Custom substring [commandFilter](src/lib/command-filter.ts) replaces cmdk's fuzzy-subsequence scorer (short queries were matching nearly everything). [TopBar](src/components/dashboard/TopBar.tsx) search centered, now a button with a ⌘K/Ctrl K hint. New dep `cmdk`. 18 new tests (233 pass); `tsc`/lint clean. Build skipped (dev running). Browser verification not done. No DB migration.
