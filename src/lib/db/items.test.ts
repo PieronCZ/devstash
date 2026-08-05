@@ -5,12 +5,15 @@ import {
   deleteItem,
   getItemDetail,
   getItemFile,
+  getItemsByType,
   toggleItemFavorite,
   toggleItemPin,
   updateItem,
 } from "@/lib/db/items";
 
 const findFirst = vi.fn();
+const findMany = vi.fn();
+const count = vi.fn();
 const updateMany = vi.fn();
 const deleteMany = vi.fn();
 const create = vi.fn();
@@ -21,6 +24,8 @@ vi.mock("@/lib/prisma", () => ({
   prisma: {
     item: {
       findFirst: (...args: unknown[]) => findFirst(...args),
+      findMany: (...args: unknown[]) => findMany(...args),
+      count: (...args: unknown[]) => count(...args),
       updateMany: (...args: unknown[]) => updateMany(...args),
       deleteMany: (...args: unknown[]) => deleteMany(...args),
       create: (...args: unknown[]) => create(...args),
@@ -575,6 +580,84 @@ describe("getItemFile", () => {
     expect(await getItemFile("user-1", "item-1")).toEqual({
       fileUrl: "https://cdn.example.com/uploads/user-1/abc.pdf",
       fileName: "abc.pdf",
+    });
+  });
+});
+
+describe("getItemsByType", () => {
+  it("scopes to owner + system type, orders pinned-first, and pages (default page 1)", async () => {
+    findMany.mockResolvedValue([]);
+    count.mockResolvedValue(0);
+
+    await getItemsByType("user-1", "snippet");
+
+    const where = { userId: "user-1", itemType: { name: "snippet", isSystem: true } };
+    expect(findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where,
+        orderBy: [{ isPinned: "desc" }, { updatedAt: "desc" }],
+        skip: 0,
+        take: 21,
+      }),
+    );
+    // Total comes from a count over the same filter.
+    expect(count).toHaveBeenCalledWith({ where });
+  });
+
+  it("computes the skip offset for a later page", async () => {
+    findMany.mockResolvedValue([]);
+    count.mockResolvedValue(50);
+
+    await getItemsByType("user-1", "snippet", { page: 3 });
+
+    expect(findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ skip: 42, take: 21 }),
+    );
+  });
+
+  it("honours a custom perPage", async () => {
+    findMany.mockResolvedValue([]);
+    count.mockResolvedValue(0);
+
+    await getItemsByType("user-1", "note", { page: 2, perPage: 10 });
+
+    expect(findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ skip: 10, take: 10 }),
+    );
+  });
+
+  it("maps rows to card shapes and returns the total", async () => {
+    const created = new Date("2026-07-01T00:00:00.000Z");
+    const updated = new Date("2026-07-02T00:00:00.000Z");
+    findMany.mockResolvedValue([
+      {
+        id: "item-1",
+        title: "useDebounce",
+        description: null,
+        contentType: "TEXT",
+        fileUrl: null,
+        fileName: null,
+        fileSize: null,
+        isFavorite: false,
+        isPinned: true,
+        createdAt: created,
+        updatedAt: updated,
+        itemType: { id: "snippet", name: "snippet", icon: "Code", color: "#3b82f6" },
+        tags: [{ name: "hooks" }],
+      },
+    ]);
+    count.mockResolvedValue(37);
+
+    const result = await getItemsByType("user-1", "snippet", { page: 1 });
+
+    expect(result.total).toBe(37);
+    expect(result.items).toHaveLength(1);
+    expect(result.items[0]).toMatchObject({
+      id: "item-1",
+      title: "useDebounce",
+      tags: ["hooks"],
+      createdAt: created.toISOString(),
+      type: { id: "snippet", name: "snippet" },
     });
   });
 });

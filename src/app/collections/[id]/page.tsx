@@ -3,30 +3,38 @@ import { notFound } from "next/navigation";
 
 import { requireUserId } from "@/lib/session";
 import { getCollectionDetail } from "@/lib/db/collections";
+import { ITEMS_PER_PAGE, parsePageParam, totalPages } from "@/lib/pagination";
 import { ItemCard } from "@/components/dashboard/ItemCard";
 import { ImageCard } from "@/components/dashboard/ImageCard";
+import { Pagination } from "@/components/dashboard/Pagination";
 import { CollectionDetailActions } from "@/components/dashboard/CollectionDetailActions";
 
 export default async function CollectionDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ page?: string }>;
 }) {
   const userId = await requireUserId();
 
   const { id } = await params;
-  const collection = await getCollectionDetail(userId, id);
+  const page = parsePageParam((await searchParams).page);
+  const collection = await getCollectionDetail(userId, id, { page });
   if (!collection) notFound();
 
+  const pageCount = totalPages(collection.total, ITEMS_PER_PAGE);
+
   // Images render as a thumbnail gallery below the rest (like the images list);
-  // everything else renders as generic cards above.
+  // everything else renders as generic cards above. Both are drawn from this
+  // page's items only.
   const imageItems = collection.items.filter(
     (item) => item.type.name === "image",
   );
   const otherItems = collection.items.filter(
     (item) => item.type.name !== "image",
   );
-  const { items } = collection;
+  const { items, total } = collection;
 
   return (
     <div className="space-y-8">
@@ -45,7 +53,7 @@ export default async function CollectionDetailPage({
             </p>
           ) : null}
           <p className="mt-1 text-sm text-muted-foreground">
-            {items.length} {items.length === 1 ? "item" : "items"}
+            {total} {total === 1 ? "item" : "items"}
           </p>
         </div>
 
@@ -84,6 +92,12 @@ export default async function CollectionDetailPage({
               </div>
             </section>
           ) : null}
+
+          <Pagination
+            currentPage={page}
+            totalPages={pageCount}
+            basePath={`/collections/${id}`}
+          />
         </div>
       ) : (
         <div className="rounded-xl border border-dashed p-12 text-center">

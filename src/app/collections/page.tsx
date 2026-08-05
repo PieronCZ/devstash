@@ -1,15 +1,25 @@
 import { LayoutGrid } from "lucide-react";
 
 import { requireUserId } from "@/lib/session";
-import { getRecentCollections } from "@/lib/db/collections";
+import { getCollectionsPage } from "@/lib/db/collections";
+import {
+  COLLECTIONS_PER_PAGE,
+  parsePageParam,
+  totalPages,
+} from "@/lib/pagination";
 import { CollectionCard } from "@/components/dashboard/CollectionCard";
+import { Pagination } from "@/components/dashboard/Pagination";
 
-export default async function CollectionsPage() {
+export default async function CollectionsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ page?: string }>;
+}) {
   const userId = await requireUserId();
 
-  // getRecentCollections returns all of the user's collections, newest first —
-  // exactly what this page lists (its name reflects the dashboard's usage).
-  const collections = await getRecentCollections(userId);
+  const page = parsePageParam((await searchParams).page);
+  const { collections, total } = await getCollectionsPage(userId, { page });
+  const pageCount = totalPages(total, COLLECTIONS_PER_PAGE);
 
   return (
     <div className="space-y-8">
@@ -20,18 +30,25 @@ export default async function CollectionsPage() {
           Collections
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          {collections.length}{" "}
-          {collections.length === 1 ? "collection" : "collections"}
+          {total} {total === 1 ? "collection" : "collections"}
         </p>
       </div>
 
       {/* Collections grid — mirrors the dashboard's responsive stepping. */}
       {collections.length > 0 ? (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {collections.map((collection) => (
-            <CollectionCard key={collection.id} collection={collection} />
-          ))}
-        </div>
+        <>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {collections.map((collection) => (
+              <CollectionCard key={collection.id} collection={collection} />
+            ))}
+          </div>
+
+          <Pagination
+            currentPage={page}
+            totalPages={pageCount}
+            basePath="/collections"
+          />
+        </>
       ) : (
         <div className="rounded-xl border border-dashed p-12 text-center">
           <p className="text-sm text-muted-foreground">No collections yet.</p>

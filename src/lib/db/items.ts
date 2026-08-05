@@ -5,6 +5,7 @@
 import type { ContentType, Prisma } from "@/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
 import { SYSTEM_TYPE_ORDER, sortBySystemTypeOrder } from "@/lib/item-types";
+import { ITEMS_PER_PAGE, pageOffset } from "@/lib/pagination";
 import type { CreateItemInput, UpdateItemInput } from "@/lib/validations/items";
 
 // The item's type, resolved for the card's icon/border/label.
@@ -419,17 +420,30 @@ export async function getSystemItemType(
   });
 }
 
-// All of the given user's items of one type, newest first (pinned float to top).
+// One page of the given user's items of one type, newest first (pinned float to
+// top), plus the total count for the pager. Only the page's rows are fetched
+// (skip/take) — never the whole set.
 export async function getItemsByType(
   userId: string,
   typeName: string,
-): Promise<DashboardItem[]> {
-  const items = await prisma.item.findMany({
-    where: { userId, itemType: { name: typeName, isSystem: true } },
-    orderBy: [{ isPinned: "desc" }, { updatedAt: "desc" }],
-    select: itemSelect,
-  });
-  return items.map(toDashboardItem);
+  { page = 1, perPage = ITEMS_PER_PAGE }: { page?: number; perPage?: number } = {},
+): Promise<{ items: DashboardItem[]; total: number }> {
+  const where = {
+    userId,
+    itemType: { name: typeName, isSystem: true },
+  } satisfies Prisma.ItemWhereInput;
+
+  const [items, total] = await Promise.all([
+    prisma.item.findMany({
+      where,
+      orderBy: [{ isPinned: "desc" }, { updatedAt: "desc" }],
+      skip: pageOffset(page, perPage),
+      take: perPage,
+      select: itemSelect,
+    }),
+    prisma.item.count({ where }),
+  ]);
+  return { items: items.map(toDashboardItem), total };
 }
 
 // A system item type as shown in the sidebar's Types list.
