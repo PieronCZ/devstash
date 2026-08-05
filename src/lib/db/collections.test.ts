@@ -5,6 +5,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 // getCollectionDetail uses prisma.collection.findFirst, so mock both.
 const collectionCreate = vi.fn();
 const collectionFindFirst = vi.fn();
+const collectionFindMany = vi.fn();
+const collectionCount = vi.fn();
 const collectionUpdateMany = vi.fn();
 const collectionDeleteMany = vi.fn();
 vi.mock("@/lib/prisma", () => ({
@@ -12,6 +14,8 @@ vi.mock("@/lib/prisma", () => ({
     collection: {
       create: (...args: unknown[]) => collectionCreate(...args),
       findFirst: (...args: unknown[]) => collectionFindFirst(...args),
+      findMany: (...args: unknown[]) => collectionFindMany(...args),
+      count: (...args: unknown[]) => collectionCount(...args),
       updateMany: (...args: unknown[]) => collectionUpdateMany(...args),
       deleteMany: (...args: unknown[]) => collectionDeleteMany(...args),
     },
@@ -22,6 +26,9 @@ import {
   createCollection,
   deleteCollection,
   getCollectionDetail,
+  getCollectionStats,
+  getCollectionsPage,
+  getRecentCollections,
   rankItemTypesByUsage,
   updateCollection,
 } from "@/lib/db/collections";
@@ -197,7 +204,7 @@ describe("getCollectionDetail", () => {
     );
   });
 
-  it("maps the collection's join items to card shapes (ISO dates, string tags)", async () => {
+  it("maps the collection's join items to card shapes (ISO dates, string tags) + total", async () => {
     const created = new Date("2026-07-01T00:00:00.000Z");
     const updated = new Date("2026-07-02T00:00:00.000Z");
     collectionFindFirst.mockResolvedValue({
@@ -205,6 +212,7 @@ describe("getCollectionDetail", () => {
       name: "React Patterns",
       description: "Handy hooks",
       isFavorite: true,
+      _count: { items: 30 },
       items: [
         {
           item: {
@@ -238,6 +246,7 @@ describe("getCollectionDetail", () => {
       name: "React Patterns",
       description: "Handy hooks",
       isFavorite: true,
+      total: 30,
       items: [
         {
           id: "item-1",
@@ -263,12 +272,13 @@ describe("getCollectionDetail", () => {
     });
   });
 
-  it("orders items pinned-first, then most-recently updated", async () => {
+  it("orders items pinned-first, then most-recently updated, and pages (page 1 default)", async () => {
     collectionFindFirst.mockResolvedValue({
       id: "col-1",
       name: "Empty",
       description: null,
       isFavorite: false,
+      _count: { items: 0 },
       items: [],
     });
 
@@ -282,9 +292,125 @@ describe("getCollectionDetail", () => {
               { item: { isPinned: "desc" } },
               { item: { updatedAt: "desc" } },
             ],
+            skip: 0,
+            take: 21,
           }),
         }),
       }),
     );
+  });
+
+  it("computes the skip offset for a later page", async () => {
+    collectionFindFirst.mockResolvedValue({
+      id: "col-1",
+      name: "Big",
+      description: null,
+      isFavorite: false,
+      _count: { items: 60 },
+      items: [],
+    });
+
+    await getCollectionDetail("user-1", "col-1", { page: 2 });
+
+    expect(collectionFindFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        select: expect.objectContaining({
+          items: expect.objectContaining({ skip: 21, take: 21 }),
+        }),
+      }),
+    );
+  });
+});
+
+describe("getCollectionsPage", () => {
+  it("scopes to owner, orders newest-first, and pages (default page 1)", async () => {
+    collectionFindMany.mockResolvedValue([]);
+    collectionCount.mockResolvedValue(0);
+
+    const result = await getCollectionsPage("user-1");
+
+    expect(collectionFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { userId: "user-1" },
+        orderBy: { updatedAt: "desc" },
+        skip: 0,
+        take: 21,
+      }),
+    );
+    expect(collectionCount).toHaveBeenCalledWith({ where: { userId: "user-1" } });
+    expect(result).toEqual({ collections: [], total: 0 });
+  });
+
+  it("computes the skip offset for a later page and maps the card shape", async () => {
+    collectionFindMany.mockResolvedValue([
+      {
+        id: "col-1",
+        name: "React Patterns",
+        description: null,
+        isFavorite: true,
+        updatedAt: new Date("2026-07-02T00:00:00.000Z"),
+        defaultType: null,
+        items: [
+          { item: { itemType: { id: "snippet", icon: "Code", color: "#3b82f6" } } },
+        ],
+      },
+    ]);
+    collectionCount.mockResolvedValue(40);
+
+    const result = await getCollectionsPage("user-1", { page: 2 });
+
+    expect(collectionFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({ skip: 21, take: 21 }),
+    );
+    expect(result.total).toBe(40);
+    expect(result.collections[0]).toMatchObject({
+      id: "col-1",
+      itemCount: 1,
+      accentColor: "#3b82f6",
+    });
+  });
+});
+
+describe("getRecentCollections", () => {
+  it("takes the dashboard limit by default (no skip)", async () => {
+    collectionFindMany.mockResolvedValue([]);
+
+    await getRecentCollections("user-1");
+
+    expect(collectionFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { userId: "user-1" },
+        orderBy: { updatedAt: "desc" },
+        take: 6,
+      }),
+    );
+    // Not a paged read — no skip.
+    expect(collectionFindMany.mock.calls[0][0]).not.toHaveProperty("skip");
+  });
+
+  it("honours a custom limit", async () => {
+    collectionFindMany.mockResolvedValue([]);
+
+    await getRecentCollections("user-1", 3);
+
+    expect(collectionFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({ take: 3 }),
+    );
+  });
+});
+
+describe("getCollectionStats", () => {
+  it("returns owner-scoped total and favorite counts", async () => {
+    collectionCount.mockResolvedValueOnce(12).mockResolvedValueOnce(4);
+
+    const result = await getCollectionStats("user-1");
+
+    expect(result).toEqual({ total: 12, favorites: 4 });
+    expect(collectionCount).toHaveBeenNthCalledWith(1, {
+      where: { userId: "user-1" },
+    });
+    expect(collectionCount).toHaveBeenNthCalledWith(2, {
+      where: { userId: "user-1", isFavorite: true },
+    });
   });
 });

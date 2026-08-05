@@ -1,8 +1,12 @@
 import type { LucideIcon } from "lucide-react";
 import { Boxes, Clock, FolderHeart, FolderOpen, LayoutGrid, Pin, Star } from "lucide-react";
 import { requireUserId } from "@/lib/session";
-import { getRecentCollections } from "@/lib/db/collections";
+import {
+  getCollectionStats,
+  getRecentCollections,
+} from "@/lib/db/collections";
 import { getItemStats, getPinnedItems, getRecentItems } from "@/lib/db/items";
+import { DASHBOARD_RECENT_ITEMS_LIMIT } from "@/lib/pagination";
 import { CollectionCard } from "@/components/dashboard/CollectionCard";
 import { ItemCard } from "@/components/dashboard/ItemCard";
 import { StatCard } from "@/components/dashboard/StatCard";
@@ -25,17 +29,14 @@ function SectionHeader({
 export default async function DashboardPage() {
   const userId = await requireUserId();
 
-  const [recentCollections, itemStats, pinnedItems, recentItems] =
+  const [recentCollections, collectionStats, itemStats, pinnedItems, recentItems] =
     await Promise.all([
       getRecentCollections(userId),
+      getCollectionStats(userId),
       getItemStats(userId),
       getPinnedItems(userId),
-      getRecentItems(userId, 10),
+      getRecentItems(userId, DASHBOARD_RECENT_ITEMS_LIMIT),
     ]);
-
-  const favoriteCollections = recentCollections.filter(
-    (collection) => collection.isFavorite,
-  );
 
   return (
     <div className="space-y-8">
@@ -43,7 +44,7 @@ export default async function DashboardPage() {
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          {itemStats.total} items · {recentCollections.length} collections
+          {itemStats.total} items · {collectionStats.total} collections
         </p>
       </div>
 
@@ -52,7 +53,7 @@ export default async function DashboardPage() {
         <StatCard label="Items" value={itemStats.total} icon={Boxes} />
         <StatCard
           label="Collections"
-          value={recentCollections.length}
+          value={collectionStats.total}
           icon={FolderOpen}
         />
         <StatCard
@@ -62,7 +63,7 @@ export default async function DashboardPage() {
         />
         <StatCard
           label="Favorite collections"
-          value={favoriteCollections.length}
+          value={collectionStats.favorites}
           icon={FolderHeart}
         />
       </div>

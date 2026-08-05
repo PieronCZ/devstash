@@ -8,6 +8,12 @@ import {
   toDashboardItem,
   type DashboardItem,
 } from "@/lib/db/items";
+import {
+  COLLECTIONS_PER_PAGE,
+  DASHBOARD_COLLECTIONS_LIMIT,
+  ITEMS_PER_PAGE,
+  pageOffset,
+} from "@/lib/pagination";
 import type {
   CreateCollectionInput,
   UpdateCollectionInput,
@@ -135,68 +141,130 @@ export function rankItemTypesByUsage<T extends { id: string }>(
     .map((r) => r.type);
 }
 
-// Recent collections for the given user, newest first, with the data the
-// card needs: item count, distinct types, and the accent color derived from
-// the most-used item type in each collection.
+// What we select to build a DashboardCollection (card): the core fields plus
+// the default type and each item's type (for the usage ranking / accent color).
+const collectionCardInclude = {
+  defaultType: { select: { id: true, icon: true, color: true } },
+  items: {
+    select: {
+      item: {
+        select: {
+          itemType: { select: { id: true, icon: true, color: true } },
+        },
+      },
+    },
+  },
+} as const;
+
+type CollectionCardRow = {
+  id: string;
+  name: string;
+  description: string | null;
+  isFavorite: boolean;
+  updatedAt: Date;
+  defaultType: { id: string; icon: string; color: string } | null;
+  items: { item: { itemType: { id: string; icon: string; color: string } } }[];
+};
+
+// Map a fetched collection row (with the card include) to the card shape.
+function toDashboardCollection(
+  collection: CollectionCardRow,
+): DashboardCollection {
+  // Most-used type first. Fall back to the default type for empty collections.
+  const ranked = rankItemTypesByUsage(collection.items);
+  const types: CollectionType[] =
+    ranked.length > 0
+      ? ranked
+      : collection.defaultType
+        ? [collection.defaultType]
+        : [];
+
+  return {
+    id: collection.id,
+    name: collection.name,
+    description: collection.description,
+    isFavorite: collection.isFavorite,
+    itemCount: collection.items.length,
+    updatedAt: collection.updatedAt.toISOString(),
+    accentColor: types[0]?.color ?? "currentColor",
+    types,
+  };
+}
+
+// Recent collections for the given user, newest first — the dashboard's fixed
+// grid (defaults to DASHBOARD_COLLECTIONS_LIMIT). Only fetches `limit` rows.
 export async function getRecentCollections(
   userId: string,
+  limit = DASHBOARD_COLLECTIONS_LIMIT,
 ): Promise<DashboardCollection[]> {
   const collections = await prisma.collection.findMany({
     where: { userId },
     orderBy: { updatedAt: "desc" },
-    include: {
-      defaultType: { select: { id: true, icon: true, color: true } },
-      items: {
-        select: {
-          item: {
-            select: {
-              itemType: { select: { id: true, icon: true, color: true } },
-            },
-          },
-        },
-      },
-    },
+    take: limit,
+    include: collectionCardInclude,
   });
-
-  return collections.map((collection) => {
-    // Most-used type first. Fall back to the default type for empty collections.
-    const ranked = rankItemTypesByUsage(collection.items);
-    const types: CollectionType[] =
-      ranked.length > 0
-        ? ranked
-        : collection.defaultType
-          ? [collection.defaultType]
-          : [];
-
-    return {
-      id: collection.id,
-      name: collection.name,
-      description: collection.description,
-      isFavorite: collection.isFavorite,
-      itemCount: collection.items.length,
-      updatedAt: collection.updatedAt.toISOString(),
-      accentColor: types[0]?.color ?? "currentColor",
-      types,
-    };
-  });
+  return collections.map(toDashboardCollection);
 }
 
-// One collection plus the items it holds, for the /collections/[id] detail page.
+// One page of the given user's collections, newest first, plus the total count
+// for the pager. Only the page's rows are fetched (skip/take).
+export async function getCollectionsPage(
+  userId: string,
+  {
+    page = 1,
+    perPage = COLLECTIONS_PER_PAGE,
+  }: { page?: number; perPage?: number } = {},
+): Promise<{ collections: DashboardCollection[]; total: number }> {
+  const [collections, total] = await Promise.all([
+    prisma.collection.findMany({
+      where: { userId },
+      orderBy: { updatedAt: "desc" },
+      skip: pageOffset(page, perPage),
+      take: perPage,
+      include: collectionCardInclude,
+    }),
+    prisma.collection.count({ where: { userId } }),
+  ]);
+  return { collections: collections.map(toDashboardCollection), total };
+}
+
+// Total and favorite collection counts for the dashboard stats — cheap counts
+// instead of deriving them from a fetched-everything list.
+export async function getCollectionStats(userId: string): Promise<{
+  total: number;
+  favorites: number;
+}> {
+  const [total, favorites] = await Promise.all([
+    prisma.collection.count({ where: { userId } }),
+    prisma.collection.count({ where: { userId, isFavorite: true } }),
+  ]);
+  return { total, favorites };
+}
+
+// One collection plus one page of the items it holds, for the /collections/[id]
+// detail page.
 export interface CollectionDetail {
   id: string;
   name: string;
   description: string | null;
   isFavorite: boolean;
-  items: DashboardItem[]; // pinned first, then most-recently updated
+  items: DashboardItem[]; // this page's items — pinned first, then most-recent
+  total: number; // total items in the collection, for the pager
 }
 
-// Full detail for one collection, scoped to its owner: its core fields plus the
-// items it holds (as card shapes). Items float pinned to the top, then order by
-// most-recently updated — matching the type listings. Returns null when the
-// collection doesn't exist or isn't owned by `userId` (caller 404s).
+// Full detail for one collection, scoped to its owner: its core fields plus one
+// page of the items it holds (as card shapes) and the total item count. Items
+// float pinned to the top, then order by most-recently updated — matching the
+// type listings. Only the page's items are fetched (skip/take); the total comes
+// from a relation `_count`. Returns null when the collection doesn't exist or
+// isn't owned by `userId` (caller 404s).
 export async function getCollectionDetail(
   userId: string,
   collectionId: string,
+  {
+    page = 1,
+    perPage = ITEMS_PER_PAGE,
+  }: { page?: number; perPage?: number } = {},
 ): Promise<CollectionDetail | null> {
   const collection = await prisma.collection.findFirst({
     where: { id: collectionId, userId },
@@ -205,11 +273,14 @@ export async function getCollectionDetail(
       name: true,
       description: true,
       isFavorite: true,
+      _count: { select: { items: true } },
       items: {
         orderBy: [
           { item: { isPinned: "desc" } },
           { item: { updatedAt: "desc" } },
         ],
+        skip: pageOffset(page, perPage),
+        take: perPage,
         select: { item: { select: itemSelect } },
       },
     },
@@ -222,6 +293,7 @@ export async function getCollectionDetail(
     description: collection.description,
     isFavorite: collection.isFavorite,
     items: collection.items.map((ic) => toDashboardItem(ic.item)),
+    total: collection._count.items,
   };
 }
 
