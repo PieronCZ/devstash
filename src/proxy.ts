@@ -12,7 +12,8 @@ export const proxy = auth((req) => {
     pathname.startsWith("/dashboard") ||
     pathname.startsWith("/items") ||
     pathname.startsWith("/collections") ||
-    pathname.startsWith("/profile");
+    pathname.startsWith("/profile") ||
+    pathname.startsWith("/settings");
 
   if (isProtected && !isLoggedIn) {
     // Redirect to the custom sign-in page, preserving where the user was
@@ -29,5 +30,6 @@ export const config = {
     "/items/:path*",
     "/collections/:path*",
     "/profile/:path*",
+    "/settings/:path*",
   ],
 };

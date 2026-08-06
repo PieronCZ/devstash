@@ -9,8 +9,6 @@ import { getProfileStats } from "@/lib/db/profile";
 import { getTypeIcon } from "@/lib/icons";
 import { Button } from "@/components/ui/button";
 import { UserAvatar } from "@/components/ui/user-avatar";
-import { ChangePasswordCard } from "@/components/profile/ChangePasswordCard";
-import { DeleteAccountCard } from "@/components/profile/DeleteAccountCard";
 
 export const metadata = {
   title: "Profile · DevStash",
@@ -153,10 +151,6 @@ export default async function ProfilePage() {
           </ul>
         </div>
       </div>
-
-      {/* Account actions */}
-      {hasPassword ? <ChangePasswordCard /> : null}
-      <DeleteAccountCard />
     </div>
   );
 }
