@@ -1,16 +1,24 @@
-# Current Feature
+# Current Feature: Settings Page
 
 ## Status
 
-Not Started
+In Progress
 
 ## Goals
 
-<!-- Bullet points of what success looks like -->
+- New protected route at `/settings` (a server component, guarded like the other authed pages via `requireUserId("/settings")` + added to the `proxy.ts` matcher).
+- Add a **Settings** link in the sidebar user dropdown ([SidebarUserMenu](src/components/dashboard/SidebarUserMenu.tsx)) — between Profile and Sign out.
+- **Move the Account actions** off the Profile page onto the Settings page: the **Change password** card ([ChangePasswordCard](src/components/profile/ChangePasswordCard.tsx)) and the **Delete account** card ([DeleteAccountCard](src/components/profile/DeleteAccountCard.tsx)).
+- Profile page keeps Identity + Usage only; Settings owns Account actions.
 
 ## Notes
 
-<!-- Additional context, constraints, or details from spec -->
+- The user's "forgot password" refers to the existing **Change password** card on the profile page (the only password-related account action there); there is no separate forgot-password control on `/profile` to move.
+- `ChangePasswordCard` renders only for credentials accounts (`!!passwordHash`), so the Settings page must fetch the user's `passwordHash` (like `/profile` does) and conditionally render it.
+- Move (don't duplicate) the two cards — remove them from [profile/page.tsx](src/app/profile/page.tsx) along with any now-unused imports.
+- Pattern to mirror: `/profile` (server component: `requireUserId` + Prisma `select`, "Back to dashboard" ghost button, `mx-auto max-w-2xl` layout).
+- No new server actions/DB reads expected beyond the existing ones the moved cards already use (`/api/auth/change-password`, `/api/account/delete`) — so likely no Vitest changes per policy. Verify in the browser.
+- No DB migration.
 
 ## History
 

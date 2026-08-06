@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { signOut } from "next-auth/react";
-import { ChevronsUpDown, LoaderCircle, LogOut, User } from "lucide-react";
+import { ChevronsUpDown, LoaderCircle, LogOut, Settings, User } from "lucide-react";
 
 import { UserAvatar } from "@/components/ui/user-avatar";
 import {
@@ -69,6 +69,13 @@ export function SidebarUserMenu({ user }: { user: SidebarUser }) {
             >
               <User />
               Profile
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              className="cursor-pointer"
+              render={<Link href="/settings" />}
+            >
+              <Settings />
+              Settings
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem
